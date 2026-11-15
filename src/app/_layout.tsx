@@ -1,3 +1,5 @@
+import "../safe-area.css";
+
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { Stack } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -25,4 +27,3 @@ export default function RootLayout() {
     </ConvexProvider>
   );
 }
-import "../safe-area.css";

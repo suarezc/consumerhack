@@ -16,7 +16,7 @@ import { bloomLabel } from "@/services/ritual";
 export function DailyTree({ bloom = false }: { bloom?: boolean }) {
   const { today } = useRitual();
   if (!today) return <LoadingDay />;
-  return <DailyTreeContent key={today.day.dayId} today={today} bloom={bloom} />;
+  return <DailyTreeContent key={`${today.tree.treeId}:${today.day.dayId}`} today={today} bloom={bloom} />;
 }
 
 function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
@@ -69,6 +69,7 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
 
   const detail = unlocked ? `${today.answerCount} ${today.answerCount === 1 ? "blossom" : "blossoms"} · tap one to read` : `${today.answerCount} of ${today.memberCount} answered · ${today.day.isDemo ? "one-minute demo" : `bloom ${bloomLabel(today.day.bloomAt)} local time`}`;
   return <Scene timeOfDay={timeOfDay} title={today.day.question}
+    treeKey={`${today.tree.treeId}:${today.day.dayId}`}
     meta={`StoryTime · ${today.tree.name}${today.day.isDemo ? " · sample day" : ""}`} detail={detail}
     onOpenTree={() => { setError(""); setSettings(true); }}
     tree={{ answers: today.answerCount, mine: today.myAnswer ? [today.myAnswer.blossom] : [], notes, lanterns: today.lanternCount, onTapBlossom: choose }}

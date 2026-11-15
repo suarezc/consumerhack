@@ -11,18 +11,19 @@ type SceneProps = {
   meta: string;
   detail?: string;
   tree?: Partial<Pick<TreeProps, "answers" | "mine" | "notes" | "lanterns" | "onTapBlossom">>;
+  treeKey?: string;
   children?: ReactNode;
   overlay?: (controlsHeight: number) => ReactNode;
   onOpenTree?: () => void;
 };
 
-export function Scene({ timeOfDay, title, meta, detail, tree, children, overlay, onOpenTree }: SceneProps) {
+export function Scene({ timeOfDay, title, meta, detail, tree, treeKey, children, overlay, onOpenTree }: SceneProps) {
   const { theme } = useStoryTime();
   const [height, setHeight] = useState(0);
   const [controls, setControls] = useState({ y: 0, height: 120 });
   const controlsHeight = height && controls.y ? height - controls.y : controls.height;
   return <View onLayout={(event) => setHeight(event.nativeEvent.layout.height)} style={[styles.scene, { backgroundColor: theme.skyTop }]}>
-    <Tree timeOfDay={timeOfDay} answers={tree?.answers ?? 0} mine={tree?.mine ?? []}
+    <Tree key={treeKey} timeOfDay={timeOfDay} answers={tree?.answers ?? 0} mine={tree?.mine ?? []}
       notes={tree?.notes ?? []} lanterns={tree?.lanterns ?? 0} onTapBlossom={tree?.onTapBlossom}
       style={StyleSheet.absoluteFill} />
     <SafeAreaView nativeID="story-scene-safe-area" style={styles.scene} pointerEvents="box-none">
