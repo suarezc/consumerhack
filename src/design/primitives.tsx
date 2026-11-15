@@ -78,19 +78,19 @@ export function StoryScreen({ children, scrollable = true, keyboardAvoiding = tr
   </View>;
 }
 
-export type StoryFieldProps = TextInputProps & { label: string; error?: string };
+export type StoryFieldProps = TextInputProps & { label: string; error?: string; labelColor?: string; errorColor?: string };
 
-export function StoryField({ label, error, style, ...props }: StoryFieldProps) {
+export function StoryField({ label, error, labelColor, errorColor, style, ...props }: StoryFieldProps) {
   const { theme, fontsLoaded } = useStoryTime();
   const id = useId();
   return <View style={styles.fieldGroup}>
-    <StoryText variant="meta">{label}</StoryText>
+    <StoryText variant="meta" color={labelColor}>{label}</StoryText>
     <TextInput {...props} accessibilityLabel={props.accessibilityLabel ?? label}
       accessibilityHint={error ?? props.accessibilityHint} aria-describedby={error ? id : undefined}
       placeholderTextColor={theme.muted} selectionColor={theme.lantern}
       style={[styles.input, { color: theme.paper, borderColor: error ? theme.lantern : theme.line,
         backgroundColor: theme.panel, fontFamily: fontsLoaded ? fontFamilies.voice : undefined }, style]} />
-    {!!error && <StoryText nativeID={id} accessibilityRole="alert" variant="caption">{error}</StoryText>}
+    {!!error && <StoryText nativeID={id} accessibilityRole="alert" variant="caption" color={errorColor}>{error}</StoryText>}
   </View>;
 }
 
