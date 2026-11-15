@@ -333,6 +333,7 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
     active = true,
     disposed = false;
   let revision = -1,
+    paintedRevision = -1,
     bloom = 0,
     bloomTarget = 0;
   const session = Date.now().toString(36) + Math.random().toString(36).slice(2);
@@ -787,6 +788,7 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
       ctx.restore();
       ctx.globalAlpha = 1;
     }
+    paintedRevision = revision;
   }
 
   function motePos(m) {
@@ -854,22 +856,33 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
     selected = -1;
     px = py = tpx = tpy = 0;
   }
-  function schedule() {
-    if (raf === null && !disposed && active && !document.hidden && !still)
+  function schedule(force = false) {
+    if (
+      raf === null &&
+      !disposed &&
+      (force || (active && !document.hidden && !still))
+    )
       raf = requestAnimationFrame(frame);
+  }
+  function animationTime() {
+    return (
+      clockT + (lastTs ? Math.max(0, (performance.now() - lastTs) / 1000) : 0)
+    );
   }
   function refresh() {
     if (!active || document.hidden || still) {
+      clockT = animationTime();
       if (raf !== null) cancelAnimationFrame(raf);
       raf = null;
       lastTs = lastPaint = 0;
+    } else if (!lastTs) {
+      lastTs = performance.now();
     }
     if (still) {
       bloom = bloomTarget;
       clearTransient();
     }
-    render();
-    schedule();
+    schedule(true);
   }
   function receive(event) {
     if (typeof event.data !== "string" || event.data.length > 100000) return;
@@ -952,7 +965,13 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
       arrivals.slice(-12).forEach(function (i) {
         if (pending[i]) return;
         pending[i] = true;
-        motes.push({ i: i, t0: clockT, fx: baseX, fy: H - 16, trail: [] });
+        motes.push({
+          i: i,
+          t0: animationTime(),
+          fx: baseX,
+          fy: H - 16,
+          trail: [],
+        });
       });
     refresh();
   }
@@ -998,7 +1017,8 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
       }
     }
     selected = best;
-    if (best >= 0) send({ type: "tap", revision: revision, index: best });
+    if (best >= 0)
+      send({ type: "tap", revision: paintedRevision, index: best });
     if (still) render();
   }
   function pointerCancel() {
@@ -1019,6 +1039,7 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
     }
     if (raf !== null) cancelAnimationFrame(raf);
     raf = null;
+    clockT = animationTime();
     lastTs = lastPaint = 0;
   }
   function pageShow(event) {
@@ -1026,14 +1047,19 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
   }
   function frame(ts) {
     raf = null;
-    if (disposed || !active || document.hidden || still) return;
+    if (disposed) return;
+    if (!active || document.hidden || still) {
+      render();
+      return;
+    }
     if (!lastPaint || ts - lastPaint >= 1000 / 30 - 1) {
-      const dt = lastTs ? Math.min(0.1, (ts - lastTs) / 1000) : 0;
+      const elapsed = lastTs ? Math.max(0, (ts - lastTs) / 1000) : 0;
+      const dt = Math.min(0.1, elapsed);
       lastTs = lastPaint = ts;
-      clockT += dt;
+      clockT += elapsed;
       px += (tpx - px) * Math.min(1, dt * 4);
       py += (tpy - py) * Math.min(1, dt * 4);
-      bloom += (bloomTarget - bloom) * Math.min(1, dt * 2.8);
+      bloom += (bloomTarget - bloom) * (1 - Math.exp(-elapsed * 2.8));
       if (Math.abs(bloomTarget - bloom) < 0.001) bloom = bloomTarget;
       render();
     }
