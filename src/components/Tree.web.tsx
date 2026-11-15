@@ -5,7 +5,12 @@ import { normalizeTreeState, readTreeMessage } from "./tree/bridge";
 import { TREE_HTML } from "./tree/html";
 import type { TreeProps } from "./tree/types";
 
-export type { TreeNote, TreeProps } from "./tree/types";
+export type {
+  TreeFruit,
+  TreeNote,
+  TreeProps,
+  TreeWateringEvent,
+} from "./tree/types";
 
 const source = TREE_HTML.replace(
   "<script>",
