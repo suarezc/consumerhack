@@ -1,4 +1,6 @@
 import { FRUIT_RUNTIME } from "./fruitRuntime";
+import { LIGHT_RUNTIME } from "./lightRuntime";
+import { WEATHER_RUNTIME } from "./weatherRuntime";
 import { TREE_MAX_FRUITS, TREE_MAX_EVENT_FRUITS, TREE_MAX_STATE_LENGTH } from "./limits";
 
 export const TREE_HTML = String.raw`<!doctype html>
@@ -13,7 +15,7 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
 #sky { display: block; width: 100%; height: 100%; touch-action: none; -webkit-user-select: none; user-select: none; }
 </style>
 </head>
-<body><main id="scene"><canvas id="sky" role="img" aria-label="A shared tree. Each blossom is an answer. Golden blossoms are yours."></canvas></main>
+<body><main id="scene"><canvas id="sky" role="img" aria-label="A shared tree of responses, with fruits and giving lights."></canvas></main>
 <script>
 (function () {
   "use strict";
@@ -230,6 +232,11 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
 
 ${FRUIT_RUNTIME}
   const fruitLayer = createFruitLayer();
+${LIGHT_RUNTIME}
+  const bundleLightLayer = createBundleLightLayer();
+  let lightBundles = null;
+${WEATHER_RUNTIME}
+  const weatherLayer = createWeatherLayer();
 
   const scene = document.getElementById("scene");
   const cv = document.getElementById("sky");
@@ -498,7 +505,7 @@ ${FRUIT_RUNTIME}
     const g = growth(t),
       b = bloom,
       nf = nightAt(t),
-      n = answersAt(t);
+      n = lightBundles === null ? answersAt(t) : 0;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     const sky = ctx.createLinearGradient(0, 0, 0, groundY + 40);
@@ -577,7 +584,9 @@ ${FRUIT_RUNTIME}
     ctx.fillStyle = C.ground(t);
     ctx.fill();
 
+    weatherLayer.background(ctx, { width: W, height: H, groundAt, buds: tree.buds, unit: U }, clockT, still);
     drawCanopy(g);
+    weatherLayer.canopy(ctx, { buds: tree.buds, unit: U });
     tree.buds.forEach(function (bud) {
       bud.open = 0;
     });
@@ -708,6 +717,7 @@ ${FRUIT_RUNTIME}
     }
 
     fruitLayer.draw(ctx, { buds, unit: U, rootX: baseX, rootY: groundY + 3, glow }, clockT, still);
+    bundleLightLayer.draw(ctx, { buds, unit: U, rootX: baseX, rootY: groundY + 3, width: W, height: H, glow, night: nf }, clockT, still);
 
     if (
       selected >= 0 &&
@@ -775,7 +785,7 @@ ${FRUIT_RUNTIME}
     ctx.globalAlpha = 1;
 
     ctx.restore();
-    if (nf > 0.2 && !still) {
+    if (nf > 0.2 && !still && lightBundles === null) {
       ctx.save();
       ctx.translate(-px * 46, -py * 14);
       ctx.fillStyle = "#ffe6a8";
@@ -920,6 +930,7 @@ ${FRUIT_RUNTIME}
       !Array.isArray(value.notes) ||
       !Number.isInteger(value.lanterns) ||
       value.lanterns < 0 ||
+      (value.lightBundles !== undefined && (!Number.isInteger(value.lightBundles) || value.lightBundles < 0 || value.lightBundles > 1000)) ||
       (Array.isArray(value.fruits) && value.fruits.length > ${TREE_MAX_FRUITS}) ||
       (Array.isArray(value.wateringEvent?.fruitIds) && value.wateringEvent.fruitIds.length > ${TREE_MAX_EVENT_FRUITS})
     )
@@ -971,8 +982,13 @@ ${FRUIT_RUNTIME}
     if (!initialized || reset || still) bloom = bloomTarget;
     revision = value.revision;
     initialized = true;
-    fruitLayer.update(value.fruits, value.wateringEvent, animationTime(), still);
-    if (!still)
+    fruitLayer.update(value.fruits, value.lightBundles !== undefined || value.lightEvent !== undefined ? null : value.wateringEvent, animationTime(), still);
+    weatherLayer.update(value.weather);
+    if (value.lightBundles !== undefined) {
+      lightBundles = value.lightBundles;
+      bundleLightLayer.update(lightBundles, value.goldenLightBundles, value.lightEvent, animationTime(), still);
+    }
+    if (!still && lightBundles === null)
       arrivals.slice(-12).forEach(function (i) {
         if (pending[i]) return;
         pending[i] = true;
@@ -1018,6 +1034,11 @@ ${FRUIT_RUNTIME}
       y = event.clientY - r.top + py * 9;
     let best = -1,
       distance = 26 * 26;
+    const responseHit = lightBundles !== null ? fruitLayer.hit(x, y, { buds: tree.buds, unit: U }) : -1;
+    if (responseHit >= 0) {
+      send({ type: "tap", revision: paintedRevision, index: responseHit });
+      return;
+    }
     for (let i = 0; i < answerCount; i++) {
       const d = tree.buds[i];
       if (!d.shown || d.open < 0.5 || pending[i]) continue;

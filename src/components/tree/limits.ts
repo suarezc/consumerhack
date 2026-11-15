@@ -1,4 +1,5 @@
 export const TREE_MAX_FRUITS = 500;
+export const TREE_MAX_LIGHT_BUNDLES = 1000;
 export const TREE_MAX_EVENT_FRUITS = 200;
 export const TREE_MAX_ID_LENGTH = 128;
 export const TREE_MAX_SESSION_LENGTH = 80;

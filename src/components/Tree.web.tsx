@@ -44,7 +44,7 @@ export function Tree(props: TreeProps) {
   const revision = useRef(0);
   const allowTaps = useRef(false);
   const [unavailable, setUnavailable] = useState<
-    "capacity" | "invalid-data" | null
+    "capacity" | "light-capacity" | "invalid-data" | null
   >(null);
   const serializer = useRef(createTreeStateSerializer());
 
@@ -69,7 +69,11 @@ export function Tree(props: TreeProps) {
       allowTaps.current = false;
       const status = getTreeDataStatus(latest.current);
       setUnavailable(
-        status.status === "unavailable" ? status.reason : "invalid-data",
+        status.status === "unavailable"
+          ? status.reason === "capacity" && status.detail === "lights"
+            ? "light-capacity"
+            : status.reason
+          : "invalid-data",
       );
       console.warn(
         "Tree snapshot exceeds supported transport limits; no fruits were truncated.",
@@ -110,7 +114,11 @@ export function Tree(props: TreeProps) {
         !allowTaps.current ||
         message.session !== session.current ||
         message.revision !== revision.current ||
-        message.index >= normalizeAnswerCount(latest.current.answers)
+        message.index >=
+          (latest.current.lightBundles !== undefined ||
+          latest.current.lightEvent !== undefined
+            ? (latest.current.fruits?.length ?? 0)
+            : normalizeAnswerCount(latest.current.answers))
       )
         return;
       latest.current.onTapBlossom?.(message.index);
@@ -131,6 +139,10 @@ export function Tree(props: TreeProps) {
     props.mine,
     props.notes,
     props.lanterns,
+    props.lightBundles,
+    props.goldenLightBundles,
+    props.lightEvent,
+    props.weather,
     props.fruits,
     props.wateringEvent,
     synchronize,
