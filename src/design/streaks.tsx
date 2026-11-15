@@ -6,12 +6,17 @@ import { useStoryTime } from './provider';
 import { RitualMark } from './RitualMark';
 import { claimGivingEvent, formatGivenTotal, streakCopy, type ConfirmedGivingEvent, type RitualSummary } from './ritual';
 
-export type TodayStreaksProps = { summary: RitualSummary | null; color?: string };
+export type TodayStreaksProps = { summary: RitualSummary | null; color?: string; compact?: boolean };
 
-export function TodayStreaks({ summary, color }: TodayStreaksProps) {
+export function TodayStreaks({ summary, color, compact = false }: TodayStreaksProps) {
   const { theme } = useStoryTime();
   const ink = color ?? theme.text;
   if (!summary) return <StoryText variant="meta" color={ink} accessibilityLabel="Loading your ritual days">Gathering your days…</StoryText>;
+  if (compact) {
+    const copy = streakCopy(summary.giving, 'giving');
+    return <View style={styles.inline}><RitualMark kind="fruit" /><StoryText variant="caption" color={ink}
+      accessibilityLabel={`${summary.isDemo ? 'Demo sample. ' : ''}${copy.description}`} style={{ fontSize: 14, lineHeight: 20 }}>{copy.label}</StoryText></View>;
+  }
   return <View style={[styles.group, styles.today]}>
     {summary.isDemo && <StoryText variant="meta" color={ink}>Demo · sample days</StoryText>}
     <View style={styles.streakRow}>

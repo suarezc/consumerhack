@@ -12,3 +12,4 @@ export type { RitualSummary, StreakState, StreakStatus, ViewerFruit, ConfirmedGi
 export { CharityDetails, TodayCharitySummary, WateringBundles, YesterdayImpact,
   type CharityDetailsProps, type TodayCharitySummaryProps, type WateringBundlesProps, type YesterdayImpactProps } from './charity-presentations';
 export type { CharityInfo, WateringBundleCount, YesterdayImpactData } from './charity';
+export { ProductScene, ProductSheet, productSceneStyles, type ProductSceneProps, type ProductSheetProps } from './ProductScene';

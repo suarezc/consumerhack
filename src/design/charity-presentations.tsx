@@ -38,17 +38,14 @@ export type TodayCharitySummaryProps = {
 
 export function TodayCharitySummary({ charity, totalRaisedCents, isDemo, onShowDetails, error }: TodayCharitySummaryProps) {
   const { theme } = useStoryTime();
-  return <View style={[styles.panel, { backgroundColor: theme.panel, borderColor: theme.line }]}>
-    <StoryText variant="meta" color={theme.paper}>{isDemo ? 'Demo · sample impact' : 'Sandbox impact'}</StoryText>
-    <StoryText color={theme.paper} accessibilityRole="header">{charity?.name ?? 'Gathering today’s charity…'}</StoryText>
-    {charity && <StoryText variant="caption" color={theme.paper}>{charity.theme}</StoryText>}
-    <View style={styles.total}>
-      <StoryText variant="meta" color={theme.paper}>Today’s paid total · gross</StoryText>
-      <StoryText color={theme.paper}>{error ? 'Total unavailable' : totalRaisedCents === null ? 'Gathering paid total…' : charityAmount(totalRaisedCents)}</StoryText>
-    </View>
-    {!!error && <StoryText accessibilityRole="alert" variant="caption" color={theme.paper}>{error}</StoryText>}
-    <StoryText variant="caption" color={theme.paper}>Sandbox example account. No real charity payout is established.</StoryText>
-    <StoryButton label={charity ? `About ${charity.name}` : 'About the charity'} tone="quiet" disabled={!charity} onPress={onShowDetails} />
+  return <View style={styles.compactSummary}>
+    <Pressable accessibilityRole="button" accessibilityLabel={charity ? `About ${charity.name}` : 'About the charity'} disabled={!charity}
+      onPress={onShowDetails} style={styles.charityLink}>
+      <StoryText variant="caption" color={theme.ink} style={styles.charityName}>{charity ? `For ${charity.name}` : 'Gathering today’s charity…'}</StoryText>
+      <StoryText variant="caption" color={theme.ink} style={styles.compactAmount}> · {error ? 'Total unavailable' : totalRaisedCents === null ? 'Gathering paid total…' : `${charityAmount(totalRaisedCents)} today`}</StoryText>
+    </Pressable>
+    {!!error && <StoryText accessibilityRole="alert" variant="caption" color={theme.ink}>{error}</StoryText>}
+    <StoryText variant="caption" color={theme.ink} style={styles.disclosure}>{isDemo ? 'Sample giving · no charge or real charity payout' : 'Sandbox example · gross total, not a real charity payout'}</StoryText>
   </View>;
 }
 
@@ -67,8 +64,8 @@ export function WateringBundles({ selectedBundles, onSelectBundles, onWater, can
   const id = useId();
   const disabled = !canWater || loading;
   const validSelection = wateringChoices.some(choice => choice.bundles === selectedBundles);
-  return <View style={[styles.panel, { backgroundColor: theme.panel, borderColor: theme.line }]}>
-    <StoryText variant="meta" color={theme.paper}>A little water, a little care</StoryText>
+  return <View style={styles.watering}>
+    <StoryText variant="caption" color={theme.paper}>Choose a little care for S.A.C.K.</StoryText>
     <View role="group" accessibilityLabel="Watering bundles" style={styles.choices}>
       {wateringChoices.map(choice => {
         const selected = selectedBundles === choice.bundles;
@@ -83,7 +80,7 @@ export function WateringBundles({ selectedBundles, onSelectBundles, onWater, can
           }]}>
           <StoryText variant="meta" color={theme.paper} style={styles.choiceLabel}>{choice.bundles} bundles</StoryText>
           <StoryText color={theme.paper} style={styles.choiceLabel}>{choice.price}</StoryText>
-          <StoryText variant="meta" color={theme.paper} style={styles.choiceLabel}>{selected ? 'Selected' : 'Choose'}</StoryText>
+          <StoryText variant="meta" color={theme.paper} style={styles.choiceLabel}>{selected ? 'Selected' : ' '}</StoryText>
         </Pressable>;
       })}
     </View>
@@ -128,9 +125,14 @@ export function YesterdayImpact({ impact, onToday, onOpenLink, children, error, 
 const styles = StyleSheet.create({
   panel: { padding: 16, borderWidth: 1, borderRadius: 16, gap: 12 },
   programs: { gap: 8 },
-  total: { gap: 4 },
+  compactSummary: { gap: 2 },
+  charityLink: { minHeight: 32, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
+  charityName: { fontSize: 16, lineHeight: 22, textDecorationLine: 'underline' },
+  compactAmount: { fontSize: 16, lineHeight: 22 },
+  disclosure: { fontSize: 12, lineHeight: 17 },
+  watering: { gap: 16 },
   choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  choice: { flexGrow: 1, flexBasis: 92, minHeight: 100, padding: 12, borderWidth: 1, borderRadius: 12, gap: 4, alignItems: 'center' },
+  choice: { flexGrow: 1, flexBasis: 82, minHeight: 96, paddingHorizontal: 8, paddingVertical: 12, borderWidth: 1, borderRadius: 12, gap: 4, alignItems: 'center' },
   choiceLabel: { alignSelf: 'stretch', textAlign: 'center' },
   link: { minHeight: 48, paddingHorizontal: 20, paddingVertical: 14, borderRadius: 999, borderWidth: 1, justifyContent: 'center' },
   yesterday: { gap: 20 },
