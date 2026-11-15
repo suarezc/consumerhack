@@ -25,7 +25,6 @@ function JoinTree() {
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [treeName, setTreeName] = useState("");
-  const [cause, setCause] = useState("");
   const [busy, setBusy] = useState(false);
   const submitting = useRef(false);
   const [error, setError] = useState("");
@@ -44,7 +43,7 @@ function JoinTree() {
     try {
       const result = mode === "join"
         ? await join({ deviceId: session.deviceId, code: code.trim(), memberName: name.trim() })
-        : await create({ deviceId: session.deviceId, name: treeName.trim(), memberName: name.trim(), ...(cause.trim() ? { cause: { name: cause.trim() } } : {}) });
+        : await create({ deviceId: session.deviceId, name: treeName.trim(), memberName: name.trim() });
       try {
         await selectTree(result.treeId);
       } catch {
@@ -74,8 +73,7 @@ function JoinTree() {
       <StoryField labelColor="#f6efe6" errorColor="#ffd27a" label="Your name" value={name} onChangeText={setName} maxLength={60} autoComplete="name" editable={!busy} />
       {mode === "join"
         ? <StoryField labelColor="#f6efe6" errorColor="#ffd27a" label="Six-character invite code" value={code} onChangeText={(value) => setCode(value.toUpperCase())} autoCapitalize="characters" autoCorrect={false} maxLength={6} editable={!busy} />
-        : <><StoryField labelColor="#f6efe6" errorColor="#ffd27a" label="Tree name" value={treeName} onChangeText={setTreeName} maxLength={80} editable={!busy} />
-          <StoryField labelColor="#f6efe6" errorColor="#ffd27a" label="A cause to support (optional)" value={cause} onChangeText={setCause} maxLength={120} editable={!busy} /></>}
+        : <StoryField labelColor="#f6efe6" errorColor="#ffd27a" label="Tree name" value={treeName} onChangeText={setTreeName} maxLength={80} editable={!busy} />}
       {!!error && <StoryText color="#ffd27a" accessibilityRole="alert">{error}</StoryText>}
       <StoryButton label={mode === "join" ? "Join tree" : "Plant tree"} loading={busy} onPress={() => { void submit(); }} />
     </Panel>}

@@ -9,6 +9,17 @@ export type WateringDispatch = Readonly<{
 
 export const emptyWateringDispatch: WateringDispatch = Object.freeze({ contextId: null, baselineId: null, treeEvent: null, feedbackEvent: null });
 
+export function createDemoWateringIntent(createId: () => string) {
+  let request: Readonly<{ bundles: 2 | 5 | 10; requestId: string }> | null = null;
+  return {
+    forBundles(bundles: 2 | 5 | 10) {
+      if (!request || request.bundles !== bundles) request = Object.freeze({ bundles, requestId: createId() });
+      return request;
+    },
+    reset() { request = null; },
+  };
+}
+
 export function createWateringObserver(createBaselineId: () => string) {
   const consumed = new Set<string>();
   const listeners = new Set<() => void>();

@@ -4,9 +4,11 @@ import { Component, useState, type ReactNode } from "react";
 import { Pressable, View } from "react-native";
 
 import { Scene, sceneStyles } from "@/components/screens/Scene";
+import { YesterdayIntro } from "@/components/screens/YesterdayIntro";
 import { ScreenState, StoryButton, StoryScreen, StoryText, StoryTimeProvider, useStoryTime } from "@/design";
 import { useRitual } from "@/providers/RitualProvider";
 import { useSession } from "@/providers/SessionProvider";
+import { firstOpenView } from "@/services/ritual";
 
 export function Screen({ title, children }: { title: string; children: ReactNode }) {
   const { theme } = useStoryTime();
@@ -21,6 +23,14 @@ export function SessionGate({ children, requireTree = false }: { children: React
     {!loading && <StoryButton label="Try again" onPress={retry} />}
   </Scene>;
   if (requireTree && !session.treeId) return <Redirect href="/" />;
+  return requireTree ? <FirstOpenGate>{children}</FirstOpenGate> : children;
+}
+
+function FirstOpenGate({ children }: { children: ReactNode }) {
+  const { today, firstOpen } = useRitual();
+  const view = firstOpenView(today?.day.dayId, firstOpen);
+  if (!today || !firstOpen || view === "loading") return <LoadingDay />;
+  if (view === "yesterday") return <YesterdayIntro key={`${today.tree.treeId}:${firstOpen.todayDayId}`} intro={firstOpen} treeId={today.tree.treeId} />;
   return children;
 }
 

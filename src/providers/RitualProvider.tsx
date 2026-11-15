@@ -10,8 +10,10 @@ import { ritualTime } from "@/services/ritual";
 import { createWateringObserver, emptyWateringDispatch, type WateringDispatch } from "@/services/watering";
 
 export type Today = NonNullable<FunctionReturnType<typeof api.days.today>>;
+export type FirstOpen = NonNullable<FunctionReturnType<typeof api.days.firstOpen>>;
 const RitualContext = createContext<{
   today: Today | null | undefined;
+  firstOpen: FirstOpen | null | undefined;
   now: number;
   timeOfDay: number;
   watering: WateringDispatch;
@@ -21,6 +23,9 @@ const RitualContext = createContext<{
 export function RitualProvider({ children }: { children: ReactNode }) {
   const { session } = useSession();
   const today = useQuery(api.days.today, session?.treeId ? {
+    deviceId: session.deviceId, treeId: session.treeId as Id<"trees">,
+  } : "skip");
+  const firstOpen = useQuery(api.days.firstOpen, session?.treeId ? {
     deviceId: session.deviceId, treeId: session.treeId as Id<"trees">,
   } : "skip");
   const [observer] = useState(() => createWateringObserver(randomUUID));
@@ -50,7 +55,7 @@ export function RitualProvider({ children }: { children: ReactNode }) {
   }, [observer, today, contextId]);
   const now = serverNow !== undefined && (tick.server !== serverNow || tick.dayId !== dayId) ? serverNow : tick.now;
   const timeOfDay = ritualTime(now, today?.day);
-  return <RitualContext.Provider value={{ today, now, timeOfDay, watering, consumeGivingFeedback: observer.consumeFeedback }}>
+  return <RitualContext.Provider value={{ today, firstOpen, now, timeOfDay, watering, consumeGivingFeedback: observer.consumeFeedback }}>
     <StoryTimeProvider timeOfDay={timeOfDay}>{children}</StoryTimeProvider>
   </RitualContext.Provider>;
 }
