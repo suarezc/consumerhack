@@ -73,8 +73,8 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
     meta={`StoryTime · ${today.tree.name}${today.day.isDemo ? " · sample day" : ""}`} detail={detail}
     onOpenTree={() => { setError(""); setSettings(true); }}
     tree={{ answers: today.answerCount, mine: today.myAnswer ? [today.myAnswer.blossom] : [], notes, lanterns: today.lanternCount, onTapBlossom: choose }}
-    overlay={() => (
-    <AnswerCard open={selected !== null} answer={selected && { id: selected.answerId, text: selected.text, author: selected.name, isMine: selected.memberId === today.member.memberId }}
+    overlay={(controlsHeight) => (
+    <AnswerCard controlsHeight={controlsHeight} open={selected !== null} answer={selected && { id: selected.answerId, text: selected.text, author: selected.name, isMine: selected.memberId === today.member.memberId }}
       onClose={() => { if (!busy) { setSelectedIndex(null); setNoteComposer(false); setError(""); } }}
       onNote={() => { setNoteComposer(true); setNoteSent(false); }} noteLoading={busy} error={error}
       onLantern={today.tree.cause && selected ? () => setLanternTarget(selected.answerId) : undefined}>
@@ -84,7 +84,7 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
       </View>)}
       {noteSent && <StoryText color="#ffd27a">Your private note was sent.</StoryText>}
       {noteComposer && selected && <View style={sceneStyles.stack}>
-        <StoryField label="A private note" value={note} onChangeText={setNote} multiline maxLength={1000} editable={!busy} />
+        <StoryField labelColor="#f6efe6" errorColor="#ffd27a" label="A private note" value={note} onChangeText={setNote} multiline maxLength={1000} editable={!busy} />
         <StoryText variant="caption" color="#c6c1c2">Only you and the author can read this.</StoryText>
         <StoryButton label="Send privately" disabled={!note.trim()} loading={busy} onPress={() => {
           if (session && note.trim()) void run(() => sendNote({ deviceId: session.deviceId, answerId: selected.answerId, text: note.trim() }), () => { setNoteComposer(false); setNote(""); setNoteSent(true); });
@@ -101,10 +101,10 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
       else if (today.answers[0]) choose(today.answers[0].blossom);
     }} />}
     {today.tree.cause && <StoryText variant="caption" color="#f6efe6">{today.tree.cause.name} · ${(today.raisedCents / 100).toFixed(2)} raised · {today.lanternCount} paid lanterns</StoryText>}
-    <TreeNavigation />
+    <TreeNavigation hill />
     {!!error && !composer && !selected && !settings && <StoryText color="#ffd27a" accessibilityRole="alert">{error}</StoryText>}
     {composer && <Panel title="What’s on your mind?" onClose={() => { if (!busy) setComposer(false); }}>
-      <StoryField label="Your answer" value={draft} onChangeText={setDraft} multiline maxLength={2000} editable={!busy} style={{ minHeight: 140 }} />
+      <StoryField labelColor="#f6efe6" errorColor="#ffd27a" label="Your answer" value={draft} onChangeText={setDraft} multiline maxLength={2000} editable={!busy} style={{ minHeight: 140 }} />
       <StoryText variant="caption" color="#c6c1c2">One answer for this day. It opens to your circle at bloom, and may become a kindred answer on another tree.</StoryText>
       {!!error && <StoryText color="#ffd27a" accessibilityRole="alert">{error}</StoryText>}
       <StoryButton label="Let it blossom" disabled={!draft.trim()} loading={busy} onPress={() => {

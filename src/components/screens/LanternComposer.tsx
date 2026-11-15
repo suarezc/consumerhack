@@ -48,7 +48,7 @@ export function LanternComposer({ treeId, answerId, cause, onClose }: {
     <StoryText color="#f6efe6">{cause}</StoryText>
     <StoryText variant="caption" color="#ffd27a">Sandbox checkout · test payments only</StoryText>
     {!checkoutUrl && <>
-      <StoryField label="Amount in USD" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" inputMode="decimal" maxLength={6} editable={!busy} />
+      <StoryField labelColor="#f6efe6" errorColor="#ffd27a" label="Amount in USD" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" inputMode="decimal" maxLength={6} editable={!busy} />
       <StoryButton label="Prepare sandbox checkout" loading={busy} onPress={() => { void prepare(); }} />
     </>}
     {checkoutUrl && <StoryButton label="Open secure sandbox checkout" loading={busy} onPress={() => {

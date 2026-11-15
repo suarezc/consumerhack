@@ -3,7 +3,7 @@ import { Component, useState, type ReactNode } from "react";
 import { Pressable, View } from "react-native";
 
 import { Scene, sceneStyles } from "@/components/screens/Scene";
-import { ScreenState, StoryButton, StoryScreen, StoryText, StoryTimeProvider } from "@/design";
+import { ScreenState, StoryButton, StoryScreen, StoryText, StoryTimeProvider, useStoryTime } from "@/design";
 import { useRitual } from "@/providers/RitualProvider";
 import { useSession } from "@/providers/SessionProvider";
 
@@ -22,10 +22,11 @@ export function SessionGate({ children, requireTree = false }: { children: React
   return children;
 }
 
-export function TreeNavigation() {
+export function TreeNavigation({ hill = false }: { hill?: boolean }) {
+  const { theme } = useStoryTime();
   return <View style={sceneStyles.row}>
     {([['Today', '/today'], ['Bloom', '/bloom'], ['Kindred', '/kindred'], ['Grove', '/grove']] as const).map(([label, route]) =>
-      <Pressable key={route} accessibilityRole="button" onPress={() => router.replace(route)} style={{ minHeight: 48, justifyContent: "center", paddingHorizontal: 8 }}><StoryText variant="meta" color="#f6efe6">{label}</StoryText></Pressable>)}
+      <Pressable key={route} accessibilityRole="button" onPress={() => router.replace(route)} style={{ minHeight: 48, justifyContent: "center", paddingHorizontal: 8 }}><StoryText variant="meta" color={hill ? theme.paper : theme.text}>{label}</StoryText></Pressable>)}
   </View>;
 }
 
@@ -52,9 +53,17 @@ export function DataFailure({ retry }: { retry: () => void }) {
 
 export function LoadingDay() {
   const { timeOfDay, today } = useRitual();
+  const { selectTree } = useSession();
+  const [error, setError] = useState(false);
+  const [busy, setBusy] = useState(false);
   return <Scene timeOfDay={timeOfDay} meta="StoryTime" title="One question. A little room to grow.">
     <StoryText color="#f6efe6">{today === undefined ? "Waiting for your tree. If this takes a while, check your connection." : "Today’s question isn’t available yet. You may have joined after the bloom."}</StoryText>
-    <TreeNavigation />
+    <StoryButton label="Choose another tree" tone="quiet" loading={busy} onPress={() => {
+      setBusy(true);
+      void selectTree(null).then(() => router.replace("/")).catch(() => setError(true)).finally(() => setBusy(false));
+    }} />
+    {error && <StoryText color="#ffd27a" accessibilityRole="alert">This device couldn’t save the change. Please try again.</StoryText>}
+    <TreeNavigation hill />
   </Scene>;
 }
 
