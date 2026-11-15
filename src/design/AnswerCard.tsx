@@ -1,5 +1,5 @@
-import { type ComponentRef, type ReactNode, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { type ComponentRef, type ReactNode, useCallback, useEffect, useId, useRef, useState } from 'react';
+import { Animated, BackHandler, Easing, Platform, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { StoryButton, StoryText } from './primitives';
@@ -11,6 +11,7 @@ export type AnswerCardProps = {
   open: boolean;
   answer: StoryAnswer | null;
   origin?: BlossomOrigin | null;
+  controlsHeight?: number;
   onClose: () => void;
   onNote?: () => void;
   onLantern?: () => void;
@@ -21,25 +22,41 @@ export type AnswerCardProps = {
 };
 
 export function AnswerCard(props: AnswerCardProps) {
-  const { width, height } = useWindowDimensions();
   if (!props.open || !props.answer) return null;
-  return <Modal visible transparent animationType="none" onRequestClose={props.onClose}>
-    <AnswerCardContent key={`${props.answer.id}:${width}:${height}:${props.origin?.x}:${props.origin?.y}`}
-      {...props} answer={props.answer} />
-  </Modal>;
+  return <AnswerCardFrame {...props} answer={props.answer} />;
 }
 
-function AnswerCardContent({ answer, origin, onClose, onNote, onLantern,
-  noteLoading, lanternLoading, error, children }: AnswerCardProps & { answer: StoryAnswer }) {
+function AnswerCardFrame(props: AnswerCardProps & { answer: StoryAnswer }) {
+  const [bounds, setBounds] = useState({ width: 0, height: 0 });
+  return <View pointerEvents="box-none" style={StyleSheet.absoluteFill} onLayout={({ nativeEvent }) => {
+    const { width, height } = nativeEvent.layout;
+    setBounds((previous) => previous.width === width && previous.height === height ? previous : { width, height });
+  }}>
+    {bounds.height > 0 && <AnswerCardContent
+      key={`${props.answer.id}:${bounds.width}:${bounds.height}:${props.origin?.x}:${props.origin?.y}:${props.controlsHeight}`}
+      {...props} availableHeight={bounds.height} />}
+  </View>;
+}
+
+function AnswerCardContent({ answer, origin, controlsHeight = 120, onClose, onNote, onLantern,
+  noteLoading, lanternLoading, error, children, availableHeight }: AnswerCardProps & { answer: StoryAnswer; availableHeight: number }) {
   const { theme, reducedMotion } = useStoryTime();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const card = useRef<ComponentRef<typeof View>>(null);
   const measured = useRef(false);
+  const opener = useRef<HTMLElement | null>(null);
+  const cardId = useId();
   const [progress] = useState(() => new Animated.Value(0));
   const [offset, setOffset] = useState<{ x: number; y: number; anchored: boolean } | null>(null);
   const originX = origin?.x;
   const originY = origin?.y;
+  const bandHeight = Number.isFinite(controlsHeight) ? Math.max(0, controlsHeight) : 120;
+  const bottom = Math.max(insets.bottom, Math.min(bandHeight, availableHeight * 0.6)) + 18;
+  const dismiss = useCallback(() => {
+    if (Platform.OS === 'web' && document.getElementById(cardId)?.contains(document.activeElement)) opener.current?.focus();
+    onClose();
+  }, [cardId, onClose]);
 
   function reveal() {
     if (measured.current) return;
@@ -66,6 +83,23 @@ function AnswerCardContent({ answer, origin, onClose, onNote, onLantern,
   }, []);
 
   useEffect(() => {
+    if (Platform.OS === 'web') {
+      if (!opener.current && document.activeElement instanceof HTMLElement) opener.current = document.activeElement;
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') dismiss();
+      };
+      document.addEventListener('keydown', onKeyDown);
+      return () => document.removeEventListener('keydown', onKeyDown);
+    }
+    if (Platform.OS !== 'android') return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      dismiss();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [dismiss]);
+
+  useEffect(() => {
     if (!offset) return;
     const animation = Animated.timing(progress, {
       toValue: 1,
@@ -77,11 +111,12 @@ function AnswerCardContent({ answer, origin, onClose, onNote, onLantern,
     return () => animation.stop();
   }, [reducedMotion, offset, progress]);
 
-  return <View style={[styles.overlay, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessible={false} />
-      <View ref={card} onLayout={reveal} collapsable={false}
-        style={[styles.cardHost, { maxHeight: height - insets.top - insets.bottom - 48 }]}>
-      <Animated.View accessibilityViewIsModal style={[styles.card, { backgroundColor: theme.panel, borderColor: theme.line,
+  return <View pointerEvents="box-none" style={[styles.overlay, { paddingTop: insets.top + 24, paddingBottom: bottom }]}>
+      <View ref={card} nativeID={cardId} onLayout={reveal} collapsable={false}
+        onAccessibilityEscape={dismiss}
+        style={[styles.cardHost, { maxHeight: Math.max(48, availableHeight - insets.top - bottom - 24) }]}>
+      <Animated.View style={[styles.card, { backgroundColor: 'rgba(9,12,34,0.86)', borderColor: theme.line,
+          ...(Platform.OS === 'web' ? { backdropFilter: 'blur(6px)' } : {}),
           opacity: offset ? progress : 0,
           transform: [
             { translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [offset?.x ?? 0, 0] }) },
@@ -90,13 +125,13 @@ function AnswerCardContent({ answer, origin, onClose, onNote, onLantern,
           ],
         }]}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.cardContent}>
+          <StoryText variant="question" color={theme.paper} style={styles.answer}>{answer.text}</StoryText>
           <View style={styles.heading}>
             <StoryText variant="meta" color={answer.isMine ? theme.lantern : theme.muted} style={styles.author}>
               {answer.isMine ? 'Your blossom' : answer.author}
             </StoryText>
-            <StoryButton label="Close" tone="quiet" onPress={onClose} />
+            <StoryButton label="Close" tone="quiet" onPress={dismiss} />
           </View>
-          <StoryText variant="question" color={theme.paper} style={styles.answer}>{answer.text}</StoryText>
           {children}
           {!!error && <StoryText accessibilityRole="alert" variant="caption" color={theme.lantern}>{error}</StoryText>}
           <View style={styles.actions}>
@@ -110,12 +145,12 @@ function AnswerCardContent({ answer, origin, onClose, onNote, onLantern,
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(4,5,13,0.42)', paddingHorizontal: 20, justifyContent: 'center', alignItems: 'center' },
-  cardHost: { width: '100%', maxWidth: 440, flexShrink: 1 },
-  card: { borderWidth: 1, borderRadius: 4, overflow: 'hidden', flexShrink: 1 },
-  cardContent: { padding: 20, gap: 20 },
+  overlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, paddingHorizontal: 20, justifyContent: 'flex-end', alignItems: 'center' },
+  cardHost: { width: '100%', maxWidth: 416, flexShrink: 1 },
+  card: { borderWidth: 1, overflow: 'hidden', flexShrink: 1 },
+  cardContent: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 16, gap: 10 },
   heading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   author: { flex: 1 },
-  answer: { fontSize: 24, lineHeight: 33 },
-  actions: { gap: 12 },
+  answer: { fontSize: 20, lineHeight: 28 },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
 });
