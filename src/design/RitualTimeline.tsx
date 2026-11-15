@@ -40,13 +40,14 @@ export function RitualTimeline({ progress, playing, stage, onScrub, onTogglePlay
   const { theme } = useStoryTime();
   const [width, setWidth] = useState(0);
   const value = Number.isFinite(progress) ? Math.max(0, Math.min(1, progress)) : 0;
+  const ended = value === 1 && !playing;
   const seek = (x: number) => { if (width > 0) onScrub(Math.max(0, Math.min(1, x / width))); };
   return <View style={styles.timeline}>
     <View style={styles.heading}>
       <StoryText variant="caption" color={theme.text}>A day in 15 seconds · {stage}</StoryText>
       <View style={styles.actions}>
-        <Pressable accessibilityRole="button" onPress={onTogglePlay} style={styles.action}>
-          <StoryText variant="control" color={theme.text} style={styles.actionLabel}>{playing ? 'Pause' : 'Play'}</StoryText>
+        <Pressable accessibilityRole="button" onPress={ended ? onRestart : onTogglePlay} style={styles.action}>
+          <StoryText variant="control" color={theme.text} style={styles.actionLabel}>{ended ? 'Replay' : playing ? 'Pause' : 'Play'}</StoryText>
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="Restart the sample day" onPress={onRestart} style={styles.action}>
           <StoryText variant="caption" color={theme.text} style={styles.actionLabel}>Restart</StoryText>
