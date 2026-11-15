@@ -40,8 +40,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     };
     void service.reconcile().then(receive);
     const removeTokens = service.listen(receive);
-    const removeForeground = installForegroundNotificationGuard(async (date) =>
-      service.allowsForeground() && await client.query(api.notifications.foregroundEligibility, { deviceId, date }));
+    const removeForeground = installForegroundNotificationGuard(async (date) => {
+      if (!service.allowsForeground()) return false;
+      const eligible = await client.query(api.notifications.foregroundEligibility, { deviceId, date });
+      return eligible && service.allowsForeground();
+    });
     const appState = AppState.addEventListener("change", (state) => {
       if (state === "active") void service.reconcile().then(receive);
     });

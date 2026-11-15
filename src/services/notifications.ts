@@ -38,14 +38,19 @@ export function createNotificationService(runtime: NotificationRuntime, backend:
   let cancelPreflight: (() => void) | undefined;
 
   function synchronize(choice?: boolean) {
-    const version = ++generation;
-    cancelPreflight?.();
+    const version = choice === undefined ? generation : ++generation;
+    if (choice !== undefined) {
+      cancelPreflight?.();
+      locallyOff = !choice;
+    }
+    let cancel!: () => void;
     const canceled = new Promise<never>((_resolve, reject) => {
-      cancelPreflight = () => reject(new Error("Notification registration superseded"));
+      cancel = () => reject(new Error("Notification registration superseded"));
     });
     void canceled.catch(() => {});
-    if (choice !== undefined) locallyOff = !choice;
     const task = async (): Promise<NotificationStatus> => {
+      if (version !== generation) return { state: "off", optIn: false };
+      cancelPreflight = cancel;
       try {
         const current = await Promise.race([backend.preference(), canceled]);
         if (version !== generation) return { state: "off", optIn: false };
