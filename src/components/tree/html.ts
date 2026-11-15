@@ -1018,6 +1018,18 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
   function visibilityChanged() {
     refresh();
   }
+  function pageHide(event) {
+    if (!event.persisted) {
+      dispose();
+      return;
+    }
+    if (raf !== null) cancelAnimationFrame(raf);
+    raf = null;
+    lastTs = lastPaint = 0;
+  }
+  function pageShow(event) {
+    if (event.persisted) refresh();
+  }
   function frame(ts) {
     raf = null;
     if (disposed || !active || document.hidden || still) return;
@@ -1047,7 +1059,8 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
     cv.removeEventListener("pointerup", pointerUp);
     cv.removeEventListener("pointercancel", pointerCancel);
     cv.removeEventListener("lostpointercapture", pointerCancel);
-    window.removeEventListener("pagehide", dispose);
+    window.removeEventListener("pagehide", pageHide);
+    window.removeEventListener("pageshow", pageShow);
     clearTransient();
   }
   const observer = new ResizeObserver(resize);
@@ -1062,7 +1075,8 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
   cv.addEventListener("pointerup", pointerUp);
   cv.addEventListener("pointercancel", pointerCancel);
   cv.addEventListener("lostpointercapture", pointerCancel);
-  window.addEventListener("pagehide", dispose);
+  window.addEventListener("pagehide", pageHide);
+  window.addEventListener("pageshow", pageShow);
   resize();
   send({ type: "ready" });
 })();
