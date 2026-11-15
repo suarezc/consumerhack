@@ -1,6 +1,6 @@
 import { router, Redirect } from "expo-router";
 import { Component, useState, type ReactNode } from "react";
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import { Scene, sceneStyles } from "@/components/screens/Scene";
 import { ScreenState, StoryButton, StoryScreen, StoryText, StoryTimeProvider } from "@/design";
@@ -25,7 +25,7 @@ export function SessionGate({ children, requireTree = false }: { children: React
 export function TreeNavigation() {
   return <View style={sceneStyles.row}>
     {([['Today', '/today'], ['Bloom', '/bloom'], ['Kindred', '/kindred'], ['Grove', '/grove']] as const).map(([label, route]) =>
-      <StoryButton key={route} label={label} tone="quiet" onPress={() => router.replace(route)} />)}
+      <Pressable key={route} accessibilityRole="button" onPress={() => router.replace(route)} style={{ minHeight: 48, justifyContent: "center", paddingHorizontal: 8 }}><StoryText variant="meta" color="#f6efe6">{label}</StoryText></Pressable>)}
   </View>;
 }
 
