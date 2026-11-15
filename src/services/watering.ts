@@ -1,4 +1,4 @@
-export type WateringEvent = Readonly<{ id: string; fruitId: string; revision: 1 }>;
+export type WateringEvent = Readonly<{ id: string; fruitId: string; revision: number }>;
 export type GivingEvent = Readonly<{ id: string; baselineId: string; givingCount: number; isDemo: boolean }>;
 export type WateringDispatch = Readonly<{
   contextId: string | null;
