@@ -34,6 +34,8 @@ Preserve `expo-notifications`, SecureStore, offline fonts and Design assets in t
 
 For standard remote reminders, expect the notifications plugin, Push Notifications capability, a correctly provisioned APNs environment and an authorized APNs key associated with the chosen team/EAS project. Reuse a suitable key rather than revoking one; APNs keys can serve other apps. Consent, token registration, service receipt and visible physical-iPhone delivery are separate checks. A TestFlight upload, a local toast or a successful simulator test does not prove remote delivery. If APNs setup is unavailable, report that limitation without stripping the existing plugin or pretending delivery passed; the Captain decides the release scope.
 
+The current notification integration also requires the same real UUID in app `extra.eas.projectId` and Convex `EXPO_PROJECT_ID`; dispatch remains off unless the backend owner enables `EXPO_PUSH_ENABLED=true` after provisioning. CONS-1 coordinates that handoff with the backend/notification owners, not by adding server secrets to EAS app variables. Respect the current unavailable/denied states until setup is actually complete; demo fixtures cannot prove real reminder eligibility or delivery.
+
 SecureStore should retain its app-specific Keychain behavior; no cross-app Keychain sharing is needed for the current app. Bundled fonts, WebView tree rendering and web checkout do not require adding App Groups, Apple Pay or widget capabilities. Do not add associated domains, background modes or extensions solely for distribution prep.
 
 ### Widgets later
