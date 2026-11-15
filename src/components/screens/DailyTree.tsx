@@ -5,12 +5,12 @@ import { useMemo, useRef, useState } from "react";
 import { View } from "react-native";
 
 import { Panel, Scene, sceneStyles } from "@/components/screens/Scene";
-import { getTreeDataStatus } from "@/components/Tree";
-import { FruitDetailStatus } from "@/components/screens/FruitDetailStatus";
 import { DemoPanel } from "@/components/screens/DemoPanel";
 import { LoadingDay, TreeNavigation } from "@/components/screens/Screen";
 import { WateringComposer } from "@/components/screens/WateringComposer";
 import { RemindersSettings } from "@/components/screens/RemindersSettings";
+import { FruitDetailStatus } from "@/components/screens/FruitDetailStatus";
+import { getTreeDataStatus } from "@/components/tree/bridge";
 import { AnswerCard, CharityDetails, GivingFeedback, productSceneStyles, StoryButton, StoryField, StoryText, TodayCharitySummary, TodayStreaks, useStoryTime } from "@/design";
 import { useRitual, type Today } from "@/providers/RitualProvider";
 import { useSession } from "@/providers/SessionProvider";
@@ -49,8 +49,9 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
   const selected = unlocked ? today.answers.find((answer) => answer.blossom === selectedIndex) ?? null : null;
   const canAnswer = !today.myAnswer && today.day.bloomedAt === undefined && now >= today.day.opensAt && now < today.day.bloomAt;
   const notes = today.notes.map((item) => ({ from: item.fromBlossom, to: item.toBlossom, count: 1, own: item.fromMemberId === today.member.memberId }));
-  const fruits = useMemo(() => today.fruits.map((fruit) => ({ id: fruit.fruitId, golden: fruit.golden, mine: fruit.isMine })), [today.fruits]);
-  const fruitStatus = useMemo(() => getTreeDataStatus({ fruits, wateringEvent: today.wateringEvent }), [fruits, today.wateringEvent]);
+  const fruits = useMemo(() => today.fruits.map((fruit) => ({ id: fruit.fruitId, golden: false, mine: fruit.isMine })), [today.fruits]);
+  const fruitStatus = getTreeDataStatus({ fruits });
+  const detailUnavailable = fruitStatus.status === "unavailable";
 
   async function run(action: () => Promise<unknown>, after?: () => void) {
     if (pending.current) return;
@@ -80,16 +81,16 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
   const detail = unlocked ? `${today.answerCount} ${today.answerCount === 1 ? "blossom" : "blossoms"} · tap one to read` : `${today.answerCount} of ${today.memberCount} answered${today.day.isDemo ? "" : ` · bloom ${bloomLabel(today.day.bloomAt)} local time`}`;
   return <Scene timeOfDay={timeOfDay} title={today.day.question}
     treeKey={`${today.tree.treeId}:${today.day.dayId}`}
-    treeUnavailable={fruitStatus.status === "unavailable"}
+    treeUnavailable={detailUnavailable}
     meta={`${bloom ? "Bloom" : "StoryTime"} · ${today.tree.name}${today.day.isDemo ? " · sample day" : ""}`} detail={detail}
     onOpenTree={() => { setError(""); setSettings(true); }}
     underQuestion={<View style={sceneStyles.stack}>
       <TodayCharitySummary charity={today.charity} totalRaisedCents={today.totalRaisedCents} isDemo={today.day.isDemo} onShowDetails={() => { setError(""); setCharityOpen(true); }} />
       <TodayStreaks compact summary={today.streaks} color={theme.text} />
-      <FruitDetailStatus status={fruitStatus} fruitCount={today.fruits.length} color={theme.text} />
+      <FruitDetailStatus status={fruitStatus} fruitCount={fruits.length} />
     </View>}
-    tree={fruitStatus.status === "ready" ? { answers: today.answerCount, mine: today.myAnswer ? [today.myAnswer.blossom] : [], notes, lanterns: 0, onTapBlossom: choose,
-      fruits, wateringEvent: watering.treeEvent } : undefined}
+    tree={{ answers: today.answerCount, mine: today.myAnswer ? [today.myAnswer.blossom] : [], notes, lanterns: 0, onTapBlossom: choose,
+      fruits, lightBundles: today.lightBundles, goldenLightBundles: today.goldenLightBundles, lightEvent: watering.treeEvent }}
     overlay={(controlsHeight) => (
     <AnswerCard controlsHeight={controlsHeight} open={selected !== null} answer={selected && { id: selected.answerId, text: selected.text, author: selected.name, isMine: selected.memberId === today.member.memberId }}
       onClose={() => { if (!busy) { setSelectedIndex(null); setNoteComposer(false); setError(""); } }}
@@ -109,12 +110,12 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
       {selected && <StoryButton label="Water today's tree for S.A.C.K." onPress={() => { setSelectedIndex(null); setWateringOpen(true); }} />}
     </AnswerCard>
     )}>
-    <GivingFeedback baselineId={watering.baselineId} event={watering.feedbackEvent} onConsumed={consumeGivingFeedback} color={theme.lantern} />
+    <GivingFeedback baselineId={watering.baselineId} event={watering.feedbackEvent} onConsumed={consumeGivingFeedback} color={detailUnavailable ? theme.text : theme.lantern} />
     {canAnswer && <StoryButton label="Leave your answer" style={productSceneStyles.primary} onPress={() => { setError(""); setComposer(true); }} />}
-    {today.myAnswer && !unlocked && <StoryText variant="caption" color="#f6efe6">Your answer is planted.</StoryText>}
-    {!today.myAnswer && !canAnswer && <StoryText color="#f6efe6">{now < today.day.opensAt ? "The question opens soon." : "This day has closed. Come back for tomorrow’s question."}</StoryText>}
+    {today.myAnswer && !unlocked && <StoryText variant="caption" color={detailUnavailable ? theme.text : theme.paper}>Your answer is planted.</StoryText>}
+    {!today.myAnswer && !canAnswer && <StoryText color={detailUnavailable ? theme.text : theme.paper}>{now < today.day.opensAt ? "The question opens soon." : "This day has closed. Come back for tomorrow’s question."}</StoryText>}
     {today.myAnswer && <StoryButton label="Water today's tree for S.A.C.K." style={productSceneStyles.primary} onPress={() => setWateringOpen(true)} />}
-    <TreeNavigation hill compact />
+    <TreeNavigation hill={!detailUnavailable} compact />
     {!!error && !composer && !selected && !settings && <StoryText color="#ffd27a" accessibilityRole="alert">{error}</StoryText>}
     {composer && <Panel title="What’s on your mind?" onClose={() => { if (!busy) setComposer(false); }}>
       <StoryField autoFocus labelColor="#f6efe6" errorColor="#ffd27a" label="Your answer" value={draft} onChangeText={setDraft} multiline maxLength={2000} editable={!busy} style={{ minHeight: 140 }} />

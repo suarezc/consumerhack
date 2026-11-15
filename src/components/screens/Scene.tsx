@@ -10,7 +10,7 @@ type SceneProps = {
   title: string;
   meta: string;
   detail?: string;
-  tree?: Partial<Pick<TreeProps, "answers" | "mine" | "notes" | "lanterns" | "onTapBlossom" | "fruits" | "wateringEvent">>;
+  tree?: Partial<Pick<TreeProps, "answers" | "mine" | "notes" | "lanterns" | "onTapBlossom" | "fruits" | "lightBundles" | "goldenLightBundles" | "lightEvent">>;
   treeKey?: string;
   treeUnavailable?: boolean;
   children?: ReactNode;
@@ -25,7 +25,8 @@ export function Scene({ timeOfDay, title, meta, detail, tree, treeKey, treeUnava
     <ProductScene title={title} meta={meta} detail={detail} onOpenTree={onOpenTree} underQuestion={underQuestion} overlay={overlay} tree={
       treeUnavailable ? null : <Tree key={treeKey} timeOfDay={timeOfDay} answers={tree?.answers ?? 0} mine={tree?.mine ?? []}
       notes={tree?.notes ?? []} lanterns={tree?.lanterns ?? 0} onTapBlossom={tree?.onTapBlossom}
-      fruits={tree?.fruits ?? []} wateringEvent={tree?.wateringEvent ?? null}
+      fruits={tree?.fruits ?? []} lightBundles={tree?.lightBundles ?? 0}
+      goldenLightBundles={tree?.goldenLightBundles ?? 0} lightEvent={tree?.lightEvent ?? null}
       style={StyleSheet.absoluteFill} />
     }>{children}</ProductScene>
   </>;

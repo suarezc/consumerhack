@@ -5,8 +5,9 @@ import * as WebBrowser from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 
-import { getTreeDataStatus, Tree } from "@/components/Tree";
+import { Tree } from "@/components/Tree";
 import { FruitDetailStatus } from "@/components/screens/FruitDetailStatus";
+import { getTreeDataStatus } from "@/components/tree/bridge";
 import { StoryScreen, StoryText, YesterdayImpact, useStoryTime } from "@/design";
 import type { FirstOpen } from "@/providers/RitualProvider";
 import { useSession } from "@/providers/SessionProvider";
@@ -27,8 +28,8 @@ export function YesterdayIntro({ intro, treeId }: { intro: FirstOpen; treeId: Id
   }, []);
   const yesterday = intro.yesterday;
   if (!yesterday) return null;
-  const fruits = yesterday.fruits.map((fruit) => ({ id: fruit.fruitId, golden: fruit.golden, mine: fruit.isMine }));
-  const fruitStatus = getTreeDataStatus({ fruits, wateringEvent: null });
+  const fruits = yesterday.fruits.map((fruit) => ({ id: fruit.fruitId, golden: false, mine: fruit.isMine }));
+  const fruitStatus = getTreeDataStatus({ fruits });
 
   async function continueToday() {
     if (!session || pending.current) return;
@@ -52,9 +53,9 @@ export function YesterdayIntro({ intro, treeId }: { intro: FirstOpen; treeId: Id
       onOpenLink={(url) => { void WebBrowser.openBrowserAsync(url).catch(() => {
         if (active.current) setError("The charity website couldn’t open. Please try again.");
       }); }}>
+    <FruitDetailStatus status={fruitStatus} fruitCount={fruits.length} />
     {fruitStatus.status === "ready" && <Tree key={yesterday.dayId} timeOfDay={1} answers={yesterday.answererCount} mine={[]} notes={[]} lanterns={0}
-      fruits={fruits} wateringEvent={null} style={{ height: 280 }} />}
-    <FruitDetailStatus status={fruitStatus} fruitCount={yesterday.fruits.length} />
+      fruits={fruits} lightBundles={yesterday.lightBundles} goldenLightBundles={yesterday.goldenLightBundles} lightEvent={null} style={{ height: 280 }} />}
     {busy && <StoryText variant="caption">Opening today’s question…</StoryText>}
   </YesterdayImpact></StoryScreen></View>;
 }

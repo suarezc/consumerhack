@@ -17,6 +17,6 @@ function GroveDays() {
   return <Screen title="Days we’ve grown together."><TreeNavigation />
     <GroveGivingSummary summary={today?.streaks ?? null} />
     {days === undefined ? <ScreenState status="loading" title="Finding the grove…" /> : days.length === 0 ? <Empty title="A small beginning." message="Past days will gather here. A missed day is a bare sapling, not a failure." />
-      : days.map((day) => <GroveThumbnail key={day.dayId} dayLabel={`${day.date} · UTC 06:00 ritual day`} question={day.question} answers={day.answerCount} missed={!day.answered} personalFruits={day.fruits} isDemo={day.isDemo} />)}
+      : days.map((day) => <GroveThumbnail key={day.dayId} dayLabel={`${day.date} · UTC 06:00 ritual day`} question={day.question} answers={day.answerCount} missed={!day.answered} isDemo={day.isDemo} />)}
   </Screen>;
 }
