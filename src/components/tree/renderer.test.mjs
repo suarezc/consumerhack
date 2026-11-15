@@ -37,6 +37,12 @@ const fruitRuntime = readFileSync(
 ).match(/String.raw`([\s\S]*)`;/)[1];
 const html = readFileSync(new URL("./html.ts", import.meta.url), "utf8")
   .replace("${FRUIT_RUNTIME}", fruitRuntime)
+  .replace(
+    "${LIGHT_RUNTIME}",
+    readFileSync(new URL("./lightRuntime.ts", import.meta.url), "utf8").match(
+      /String.raw`([\s\S]*)`;/,
+    )[1],
+  )
   .replaceAll("${TREE_MAX_STATE_LENGTH}", String(limits.TREE_MAX_STATE_LENGTH))
   .replaceAll("${TREE_MAX_FRUITS}", String(limits.TREE_MAX_FRUITS))
   .replaceAll("${TREE_MAX_EVENT_FRUITS}", String(limits.TREE_MAX_EVENT_FRUITS));
