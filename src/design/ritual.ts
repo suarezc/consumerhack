@@ -15,7 +15,7 @@ export type ViewerFruit = {
   milestone: 3 | 7 | 30 | null;
   isMine: boolean;
   source: 'whop' | 'demo';
-  paidAt: number;
+  paidAt: number | null;
 };
 export type ConfirmedGivingEvent = Readonly<{
   id: string;
