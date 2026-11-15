@@ -10,15 +10,19 @@ A thoughtful, nearly meditative daily ritual for small groups. Each tree gets on
 - Identity is anonymous: a `deviceId` generated on first launch and stored on the device. No accounts.
 - No Xcode or Android SDK on the machines. Builds and device runs go through Revyl.
 
-## Objects (`convex/schema.ts`)
+## DATA (`convex/schema.ts`)
 
-- **trees**: a name, a six-character invite `code`, a host, and an optional `cause` that lanterns raise money for.
+- **trees**: a name, a six-character invite `code`, a host, and an optional `cause` that waterings raise money for.
 - **members**: a person (`deviceId`) in a tree, with a display name.
 - **days**: one question per tree per day, chosen by a morning cron job, with `bloomAt` and `bloomedAt` once it blooms.
 - **answers**: one per member per day, with text, its `blossom` index on the tree, and a `mood` score and `embedding` filled in by the judges.
 - **kindred**: for an answer, three matches from other trees, each with a one-line reason.
 - **notes**: a private message on someone's answer, drawn on the tree as a fairy light.
-- **lanterns**: a Whop payment hung on a tree or an answer; the only money object. A lantern is `paid` only when the Whop webhook says so.
+- **lanterns**: the SINGLE physical canonical money ledger, exposed as **waterings** in the product/API. There is no second waterings table or combined-ledger sum. A real watering is paid only after signed webhook and sandbox API verification. Optional factual `paidAt` comes from provider `paid_at`; `creditedDate = ritualWindow(paidAt).date`, never checkout `createdAt` or callback arrival. `source: 'demo'` and `demoRunId` identify synthetic fixtures; omitted source on historical rows means real Whop.
+- **notificationPreferences / notificationOutbox**: explicit opt-in/permission/token state and a user/date deduplicated dispatch record. Neither holds a streak counter. Bearer identity, push tokens and private notes never appear in other users' projections or provider payload data.
+- No streak counters are stored. Convex queries compute answer and giving date sets across ALL memberships for the anonymous device identity. Paid amounts count once per distinct contribution date, not per payment or fifty-cent unit. Real all-time totals preserve historical paid rows even when provider dates are missing; those rows cannot establish a streak or fruit date until verified backfill supplies the facts.
+- Migration is additive and idempotent: retain IDs/paid rows/checkout and payment identity, add optional factual fields and indexes, and use a bounded resumable internal provider-backed backfill to fill only missing dates on already-paid matching rows. Never invent a date, promote pending rows in backfill, or count the same provider payment twice. Already-issued reusable checkout links retain their original whole-cent verification semantics and metadata marker.
+- Clock contract: a day is **06:00 UTC through the next 06:00 UTC**, bloom normally at 21:00 UTC. It is not calendar midnight or device-local midnight. Answers, paid credit, Grove, streaks and notification deduplication share this ritual boundary. Queries return server `{date,opensAt,nextBoundaryAt,now}`; Today and streak summary depend on the next real-day insertion so morning rollover invalidates subscriptions.
 
 ## Rules
 
@@ -30,14 +34,35 @@ A thoughtful, nearly meditative daily ritual for small groups. Each tree gets on
 6. Notes and reactions are visible only to the author of the answer they're on (and the sender).
 7. Past days form the grove; a missed day is a bare sapling.
 8. A demo switch runs a whole day in about a minute: it compresses the clock for a tree, seeds sample answers and triggers the bloom and the judges on cue. It must work reliably on stage.
+9. Waterings use positive integer cents in $0.50 increments, capped at $100. Only confirmed paid waterings create real fruit or trigger a real watering reaction. The existing sandbox inline checkout rejects $0.50 (HTTP400: plan must be at least $1.00); a $1.50 checkout configuration succeeds but has not been paid. Charles's pricing decision is pending: do not claim a working fifty-cent purchase, silently raise the minimum, or credit unpaid money.
+10. Answer streak: the number of consecutive days, ending today or yesterday, on which the user answered.
+11. Giving streak: the number of consecutive days, ending today or yesterday, on which the user has at least one paid watering. Any valid paid amount counts. Several waterings in one day count once.
+12. A streak that includes yesterday but not yet today is shown as "at risk", not broken. It breaks only when a full ritual day passes with nothing.
+13. At giving streaks of exactly 3, 7 and 30 days, THAT contribution date's fruit from the user is drawn golden on the shared tree and in their Grove. Compute the streak ending that historical date; never recolor past fruit from the user's current streak.
 
-## Screens
+## SCREENS
 
 1. Join or create a tree by code.
-2. Today: the tree, the question and your answer.
-3. Bloom: tap blossoms to read, leave a note or hang a lantern.
+2. Today: the tree, the question and your answer. Under the question show both computed streaks, each a small icon and number: blossom for answers, fruit for giving, with the at-risk state.
+3. Bloom: tap blossoms to read, leave a note or water the tree. After a confirmed paid watering, briefly show the new giving streak ("4 days of giving"). The tree reacts to the new canonical paid fruit ID, never checkout close/return; baseline initial subscription hydration/reload and consume each event once.
 4. Kindred.
-5. Grove.
+5. Grove: past trees where the viewer gave show their own fruit, with golden flags computed for each historical date. Show the longest giving streak and the user's total given. Active demo history and totals are clearly synthetic and isolated from real-account totals.
+
+`streaks.summary` and Today return `{clock,answer:{count,status},giving:{count,status,longest,totalCents},currency:'USD',isDemo,undatedPaidCount}`; status is `current|at_risk|none`. Fruit projections expose opaque canonical row ID/date/golden/milestone/isMine/source/paidAt, never provider IDs or bearer identity. Grove retains its day-array shape with viewer-only `fruits`. `waterings.checkout` aliases `lanterns.checkout`; both use the same ledger.
+
+## NOTIFICATIONS
+
+- After a real bloom, if the user's giving streak is at risk, send one opt-in notification: **"Today's tree has bloomed. Water it to keep your N-day streak."** At most one per user/ritual date across all trees, and none if the user has no streak or has already given today.
+- Respect explicit opt-in and granted OS permission; do not prompt automatically, invent tokens, or call a toast a delivered notification. The atomic bloom hook queues/deduplicates. Recheck the real-only computed giving streak, source bloom, membership, current ritual date and latest preference/token state immediately before dispatch.
+- Persist a dispatch claim before external sending. Unknown acceptance is terminal; never retry it. Only a known explicit provider rejection may be bounded-retried after full recheck. Provider acceptance and receipt handoff are not proof of OS display; a payment committed after the dispatch claim cannot atomically cancel an accepted external alert. Demo fixtures never send real notifications.
+- Real remote push needs a push-enabled native build, genuine project/APNs/FCM provisioning and permission on a supported physical device. Revyl simulator UX/testing alone is not proof of remote notification delivery.
+
+## DEMO MODE
+
+- Restart seeds the active demo user with answers and explicitly synthetic paid watering fixtures for the previous three ritual dates, so both streaks start at 3, at risk. Today's answer makes the answer streak 4; the next confirmed or explicit synthetic demo watering makes the giving streak 4.
+- Every fixture/history day is tagged with the active run ID. Stop/restart hides old fixtures and stale callbacks cannot affect a new run. Synthetic ledger rows have `source:'demo'`, no provider payment ID, and are excluded from real giving/raised totals and notification eligibility.
+- `waterings.demoWater` is a clearly labelled synthetic demo interaction, available after participation and bloom, idempotent once per user/run and guarded by the submitted run ID. It is not Whop-confirmed money. Real sandbox checkout remains genuine and webhook-authoritative; real payment rows survive stop/reset and count in real totals even when a callback arrives after its original demo run ended, but cannot react in a newer demo run.
+- An active demo pins its displayed ritual date to the run's start date while its one-minute growth clock drives the current tree. It does not change the real server's06:00UTC question/streak policy.
 
 ## The tree
 
@@ -47,15 +72,17 @@ A thoughtful, nearly meditative daily ritual for small groups. Each tree gets on
 
 Change the props only with both sides agreeing. Visual identity: Newsreader (voice) and IBM Plex Mono (meta), the colours in `design/tree.html`, and one visual world set by the time of day rather than system light/dark mode.
 
-## Whop lanterns
+## Whop waterings (legacy physical lanterns ledger)
 
-The cause-tree framing: lanterns raise money for a cause the tree picks, shown as a running total. Use web checkout, not Whop's native SDK (it has no sandbox and is Swift-only). A Convex action creates the checkout with `@whop/sdk`, the app opens it with `expo-web-browser`, and Whop's `payment.succeeded` webhook hits the Convex HTTP route `/whop`, which marks the lantern paid. Light a lantern from the webhook record, never when the browser closes. `WHOP_ENVIRONMENT` must be `sandbox`; the test card is 4242 4242 4242 4242.
+The cause-tree framing: waterings raise money for a cause the tree picks, shown as a running total. Use web checkout, not Whop's native SDK (it has no sandbox and is Swift-only). A Convex action creates the checkout with `@whop/sdk`, the app opens it with `expo-web-browser`, and Whop's `payment.succeeded` webhook hits the Convex HTTP route `/whop`. Preserve raw-body official signature validation, sandbox API payment retrieval, exact USD subtotal/tax/total and metadata bindings. Deduplicate globally by provider payment ID; reusable checkout IDs are one-to-many. Real fruit lights only from the paid ledger record. `WHOP_ENVIRONMENT` must be `sandbox`; the test card is 4242 4242 4242 4242. Existing $1 browser/webhook/replay proof is not proof of $0.50 support or phone checkout.
 
-## Ownership
+## HOW TO WORK
 
-- Data and server logic (`convex/`): the Build crew. The schema is the shared contract; announce changes to it.
+- Data and server logic (`convex/`): the Build crew. The assigned core owner alone writes schema, crons and lifecycle integration; announce API/schema contracts early and route notification schema/hook requests through the Build Captain.
 - The tree and the visual system (`src/components/Tree.tsx`, theme, fonts, motion): the Design crew.
 - Screens (`src/app/`): Build wires data; Design styles. Keep PRs small and merge often to avoid conflicts.
+- Write Convex tests for rules10–12 including at-risk yesterday continuity, a full empty day, two waterings on one day and cross-membership date deduplication. Also cover calendar midnight versus06:00UTC rollover, pending/failed/replayed payments, provider paidAt versus checkout creation, historical3/7/30 golden dates, privacy and demo reset/isolation.
+- Preserve merged core/Whop/judges. Use fresh branches against main, never closed PR branches. Coordinate every shared Convex deploy AND codegen through the Captain: codegen stages remote analysis/schema even though it does not activate code. Never deploy an incomplete parallel checkout over another owner's functions. Get an independent exact-head review, run the checks below, and distinguish provider/device evidence from simulated tests. Never merge without explicit approval for that PR.
 
 ## Checks
 

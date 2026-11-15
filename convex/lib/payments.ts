@@ -7,8 +7,8 @@ export function requireSandbox(environment: string | undefined) {
 }
 
 export function validateAmount(amountCents: number) {
-  if (!Number.isSafeInteger(amountCents) || amountCents < 100 || amountCents > 10_000) {
-    throw new Error("Choose an amount between $1 and $100 in whole cents");
+  if (!Number.isSafeInteger(amountCents) || amountCents <= 0 || amountCents % 50 !== 0 || amountCents > 10_000) {
+    throw new Error("Choose an amount from $0.50 to $100 in $0.50 increments");
   }
 }
 
@@ -55,6 +55,7 @@ export type VerifiedPayment = {
   memberId: string;
   answerId?: string;
   amountCents: number;
+  paidAt?: number;
 };
 
 export function verifyPayment(
@@ -68,7 +69,7 @@ export function verifyPayment(
     throw new Error("Payment has not been verified");
   }
   const amountCents = usdCents(payment.subtotal);
-  validateAmount(amountCents);
+  if (amountCents < 1 || amountCents > 10_000) throw new Error("Invalid contribution amount");
   const taxCents = payment.tax_amount == null ? 0 : usdCents(payment.tax_amount);
   if (taxCents > 0 && payment.tax_behavior !== "exclusive" && payment.tax_behavior !== "inclusive") {
     throw new Error("Payment tax behavior is not supported");
@@ -83,6 +84,9 @@ export function verifyPayment(
       (metadata.answerId !== undefined && typeof metadata.answerId !== "string")) {
     throw new Error("Payment is not a StoryTime lantern");
   }
+  const paidAt = payment.paid_at == null ? undefined :
+    typeof payment.paid_at === "string" && /^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(payment.paid_at) ? Date.parse(payment.paid_at) : NaN;
+  if (paidAt !== undefined && (!Number.isFinite(paidAt) || paidAt <= 0)) throw new Error("Invalid provider paid timestamp");
   return {
     paymentId: identifier(payment.id, "pay_"),
     checkoutId: identifier(payment.checkout_configuration_id, "ch_"),
@@ -90,6 +94,7 @@ export function verifyPayment(
     memberId: metadata.memberId,
     ...(metadata.answerId === undefined ? {} : { answerId: metadata.answerId }),
     amountCents,
+    ...(paidAt === undefined ? {} : { paidAt }),
   };
 }
 
