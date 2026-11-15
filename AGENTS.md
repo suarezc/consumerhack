@@ -34,7 +34,7 @@ A thoughtful, nearly meditative daily ritual for small groups. Each tree gets on
 6. Notes and reactions are visible only to the author of the answer they're on (and the sender).
 7. Past days form the grove; a missed day is a bare sapling.
 8. A demo switch runs a whole day in about a minute: it compresses the clock for a tree, seeds sample answers and triggers the bloom and the judges on cue. It must work reliably on stage.
-9. New waterings have a $1 minimum, then $0.50 increments, capped at $100 (integer cents 100..10000, divisible by 50). Charles approved this minimum after the existing sandbox inline checkout rejected $0.50 (HTTP 400: plan must be at least $1.00). A $1.50 checkout configuration succeeds but has not been paid. Never silently change a selected charge or credit unpaid money. Only confirmed paid waterings create real fruit or trigger a real watering reaction.
+9. New waterings have a $1 minimum, then $0.50 increments, capped at $100 (integer cents 100..10000, divisible by 50). A standalone $0.50 checkout is unsupported on the existing Whop path. Never silently change a selected charge or credit unpaid money. Only confirmed paid waterings create real fruit or trigger a real watering reaction.
 10. Answer streak: the number of consecutive days, ending today or yesterday, on which the user answered.
 11. Giving streak: the number of consecutive days, ending today or yesterday, on which the user has at least one paid watering. Any valid paid amount counts. Several waterings in one day count once.
 12. A streak that includes yesterday but not yet today is shown as "at risk", not broken. It breaks only when a full ritual day passes with nothing.
@@ -69,6 +69,8 @@ A thoughtful, nearly meditative daily ritual for small groups. Each tree gets on
 `design/tree.html` is the reference: the canvas tree, palette by time of day, blossoms, fairy-light notes and the answer-landing animation. The app renders it through `src/components/Tree.tsx`, whose props are the contract between the data and the visuals:
 
 - `timeOfDay` 0..1 (0 = 6:00, 1 = 21:00), `answers` (blossom count), `mine` (blossom indices that are the viewer's), `notes` (strands between two blossoms with a light count), `lanterns` (count), `onTapBlossom(index)`.
+- The agreed additive watering contract preserves those props and adds optional `fruits?: readonly { id: string; golden: boolean; mine?: boolean }[]` and `wateringEvent?: { id: string; fruitId: string; revision: number } | null`. Map the backend's opaque `fruitId` to `id` and `isMine` to `mine`; never send provider payment IDs or bearer identity to the renderer. `wateringEvent` represents a newly confirmed paid event, with `revision` as a payload version rather than a stored streak/event counter. Baseline hydration/reload and consume each event once; fruit backfill or checkout return alone must not trigger a success reaction.
+- Design owns implementing and verifying these optional renderer inputs and their fruit/watering motion. Recording the agreed contract here does not claim that renderer support has shipped.
 
 Change the props only with both sides agreeing. Visual identity: Newsreader (voice) and IBM Plex Mono (meta), the colours in `design/tree.html`, and one visual world set by the time of day rather than system light/dark mode.
 
