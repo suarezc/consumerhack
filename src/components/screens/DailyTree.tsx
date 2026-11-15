@@ -105,7 +105,7 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
     )}>
     <GivingFeedback baselineId={watering.baselineId} event={watering.feedbackEvent} onConsumed={consumeGivingFeedback} color={theme.lantern} />
     {canAnswer && <StoryButton label="Leave your answer" style={productSceneStyles.primary} onPress={() => { setError(""); setComposer(true); }} />}
-    {today.myAnswer && !unlocked && <StoryText color="#f6efe6">Your blossom is on the tree. The answers open when everyone has answered, or at bloom time.</StoryText>}
+    {today.myAnswer && !unlocked && <StoryText variant="caption" color="#f6efe6">Your answer is planted.</StoryText>}
     {!today.myAnswer && !canAnswer && <StoryText color="#f6efe6">{now < today.day.opensAt ? "The question opens soon." : "This day has closed. Come back for tomorrow’s question."}</StoryText>}
     {today.myAnswer && <StoryButton label="Water today's tree for S.A.C.K." style={productSceneStyles.primary} onPress={() => setWateringOpen(true)} />}
     <TreeNavigation hill compact />
