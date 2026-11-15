@@ -49,8 +49,6 @@ export function WateringComposer({ today, onClose }: {
   }
 
   return <Panel title="A little care, together." onClose={() => { if (!busy) onClose(); }}>
-    <StoryText color="#f6efe6">{today.charity.name}</StoryText>
-    <StoryText variant="caption" color="#ffd27a">{today.day.isDemo ? "Demo · sample money · no charge" : "Sandbox checkout · test payments only · no real donation or payout is established"}</StoryText>
     {!checkoutUrl && <WateringBundles selectedBundles={bundles} onSelectBundles={(next) => {
       if (pending.current) return;
       setBundles(next);
@@ -62,7 +60,7 @@ export function WateringComposer({ today, onClose }: {
       setError("");
       void WebBrowser.openBrowserAsync(checkoutUrl).then(() => setOpened(true)).catch(() => setError("The browser couldn’t open. Please try the checkout button again.")).finally(() => setBusy(false));
     }} />}
-    <StoryText variant="caption" color="#c6c1c2">{opened ? "Checkout was opened. " : ""}Closing checkout never adds fruit or extends a streak. The tree reacts only after the payment service verifies the watering.</StoryText>
+    {checkoutUrl && <StoryText variant="caption" color="#c6c1c2">{opened ? "Checkout was opened. " : ""}Closing checkout never confirms payment. Fruit appears only after the payment service verifies it.</StoryText>}
     {!!checkoutUrl && !!error && <StoryText color="#ffd27a" accessibilityRole="alert">{error}</StoryText>}
   </Panel>;
 }
