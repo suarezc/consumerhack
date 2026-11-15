@@ -110,7 +110,11 @@ export function Tree(props: TreeProps) {
         !allowTaps.current ||
         message.session !== session.current ||
         message.revision !== revision.current ||
-        message.index >= normalizeAnswerCount(latest.current.answers)
+        message.index >=
+          (latest.current.lightBundles !== undefined ||
+          latest.current.lightEvent !== undefined
+            ? (latest.current.fruits?.length ?? 0)
+            : normalizeAnswerCount(latest.current.answers))
       )
         return;
       latest.current.onTapBlossom?.(message.index);
@@ -134,6 +138,7 @@ export function Tree(props: TreeProps) {
     props.lightBundles,
     props.goldenLightBundles,
     props.lightEvent,
+    props.weather,
     props.fruits,
     props.wateringEvent,
     synchronize,

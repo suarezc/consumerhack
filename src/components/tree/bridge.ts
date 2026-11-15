@@ -68,6 +68,14 @@ export function getTreeDataStatus(
 export function normalizeTreeState(props: TreeProps) {
   const answers = normalizeAnswerCount(props.answers);
   const lightBundles = count(props.lightBundles ?? 0, 1000);
+  const responseMode =
+    props.lightBundles !== undefined || props.lightEvent !== undefined;
+  const responseIndices = new Map<string, number>();
+  if (responseMode && Array.isArray(props.fruits))
+    props.fruits.forEach((fruit, index) => {
+      if (fruit && !responseIndices.has(fruit.id))
+        responseIndices.set(fruit.id, index);
+    });
   const event = props.lightEvent;
   const lightEvent =
     event &&
@@ -114,6 +122,10 @@ export function normalizeTreeState(props: TreeProps) {
           }))
       : [],
     lanterns: count(props.lanterns, 64),
+    weather:
+      props.weather === "rain" || props.weather === "snow"
+        ? props.weather
+        : "clear",
     ...(props.lightBundles !== undefined
       ? {
           lightBundles,
@@ -126,6 +138,9 @@ export function normalizeTreeState(props: TreeProps) {
     ...(props.lightEvent !== undefined ? { lightEvent } : {}),
     fruits: normalizeFruits(props.fruits).map((fruit) => ({
       ...fruit,
+      ...(responseMode
+        ? { golden: false, responseIndex: responseIndices.get(fruit.id) }
+        : {}),
       anchor: fruitAnchorSeed(fruit.id),
     })),
     wateringEvent: normalizeWateringEvent(props.wateringEvent),

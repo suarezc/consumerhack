@@ -6,13 +6,15 @@ function createBundleLightLayer() {
   const seed = (index, salt) => ((Math.imul(index + 1, 2654435761) ^ salt) >>> 0) / 4294967295;
   return {
     update(value, subset, event, now, reduced) {
+      if (value < count || reduced) pulseStart = -Infinity;
       if (Number.isInteger(value) && value >= 0 && value <= 1000) count = value;
       golden = Number.isInteger(subset) ? Math.min(count, Math.max(0, subset)) : 0;
-      const valid = event && typeof event.id === "string" && event.id.length > 0 && event.id.length <= 128 && Number.isSafeInteger(event.revision) && event.revision > 0 && Number.isInteger(event.lightBundles) && event.lightBundles > 0 && event.lightBundles <= count;
+      const valid = event && typeof event.id === "string" && event.id.length > 0 && event.id.length <= 128 && Number.isSafeInteger(event.revision) && event.revision > 0 && Number.isInteger(event.lightBundles) && event.lightBundles > 0 && event.lightBundles <= 1000;
       if (!initialized) { initialized = true; if (valid) consumed.add(event.id); }
-      else if (valid && !consumed.has(event.id)) { consumed.add(event.id); if (!reduced) pulseStart = now; }
+      else if (valid && event.lightBundles <= count && !consumed.has(event.id)) { consumed.add(event.id); if (!reduced) pulseStart = now; }
     },
     draw(ctx, scene, now, reduced) {
+      if (reduced) pulseStart = -Infinity;
       if (!count) return;
       const visible = scene.buds.filter(bud => bud.shown);
       const radius = Math.max(2.2, scene.unit * 0.022);

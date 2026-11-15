@@ -65,6 +65,17 @@ function createFruitLayer() {
     };
   }
   return {
+    hit(x, y, geometry) {
+      let selected = -1, nearest = 26 * 26;
+      for (const fruit of fruits) {
+        if (!Number.isInteger(fruit.responseIndex)) continue;
+        const point = target(fruit, geometry);
+        if (!point) continue;
+        const distance = (point.x - x) ** 2 + (point.y - y) ** 2;
+        if (distance < nearest) { nearest = distance; selected = fruit.responseIndex; }
+      }
+      return selected;
+    },
     update(value, event, now, reduced) {
       if (event !== undefined) currentEvent = event;
       if (value !== undefined) {

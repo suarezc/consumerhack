@@ -1,5 +1,6 @@
 import { FRUIT_RUNTIME } from "./fruitRuntime";
 import { LIGHT_RUNTIME } from "./lightRuntime";
+import { WEATHER_RUNTIME } from "./weatherRuntime";
 import { TREE_MAX_FRUITS, TREE_MAX_EVENT_FRUITS, TREE_MAX_STATE_LENGTH } from "./limits";
 
 export const TREE_HTML = String.raw`<!doctype html>
@@ -234,6 +235,8 @@ ${FRUIT_RUNTIME}
 ${LIGHT_RUNTIME}
   const bundleLightLayer = createBundleLightLayer();
   let lightBundles = null;
+${WEATHER_RUNTIME}
+  const weatherLayer = createWeatherLayer();
 
   const scene = document.getElementById("scene");
   const cv = document.getElementById("sky");
@@ -581,7 +584,9 @@ ${LIGHT_RUNTIME}
     ctx.fillStyle = C.ground(t);
     ctx.fill();
 
+    weatherLayer.background(ctx, { width: W, height: H, groundAt, buds: tree.buds, unit: U }, clockT, still);
     drawCanopy(g);
+    weatherLayer.canopy(ctx, { buds: tree.buds, unit: U });
     tree.buds.forEach(function (bud) {
       bud.open = 0;
     });
@@ -978,6 +983,7 @@ ${LIGHT_RUNTIME}
     revision = value.revision;
     initialized = true;
     fruitLayer.update(value.fruits, value.lightBundles !== undefined || value.lightEvent !== undefined ? null : value.wateringEvent, animationTime(), still);
+    weatherLayer.update(value.weather);
     if (value.lightBundles !== undefined) {
       lightBundles = value.lightBundles;
       bundleLightLayer.update(lightBundles, value.goldenLightBundles, value.lightEvent, animationTime(), still);
@@ -1028,6 +1034,11 @@ ${LIGHT_RUNTIME}
       y = event.clientY - r.top + py * 9;
     let best = -1,
       distance = 26 * 26;
+    const responseHit = lightBundles !== null ? fruitLayer.hit(x, y, { buds: tree.buds, unit: U }) : -1;
+    if (responseHit >= 0) {
+      send({ type: "tap", revision: paintedRevision, index: responseHit });
+      return;
+    }
     for (let i = 0; i < answerCount; i++) {
       const d = tree.buds[i];
       if (!d.shown || d.open < 0.5 || pending[i]) continue;

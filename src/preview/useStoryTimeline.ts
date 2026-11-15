@@ -11,6 +11,7 @@ export function useStoryTimeline() {
   const [actions, setActions] = useState<SampleAction[]>([]);
   const started = useRef(0);
   const sequence = useRef(0);
+  const run = useRef(0);
   useEffect(() => {
     if (!playing) return;
     if (!started.current) started.current = performance.now();
@@ -49,6 +50,7 @@ export function useStoryTimeline() {
       setProgress(Math.min(1, Math.max(0, value)));
     },
     restart() {
+      run.current += 1;
       sequence.current = 0;
       setActions([]);
       setProgress(0);
@@ -57,10 +59,11 @@ export function useStoryTimeline() {
     },
     addResponse() {
       setPlaying(false);
+      const id = `sample-run-${run.current}-response-${++sequence.current}`;
       setActions((v) => [
         ...v,
         {
-          id: `sample-extra-response-${++sequence.current}`,
+          id,
           at: progress,
           type: "response",
         },
@@ -70,10 +73,11 @@ export function useStoryTimeline() {
       if (!snapshot.fruits.length || snapshot.lightBundles + bundles > 1000)
         return;
       setPlaying(false);
+      const id = `sample-run-${run.current}-bundle-${++sequence.current}`;
       setActions((v) => [
         ...v,
         {
-          id: `sample-bundle-action-${++sequence.current}`,
+          id,
           at: progress,
           type: "bundles",
           bundles,
