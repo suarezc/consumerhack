@@ -14,7 +14,7 @@ const snapshot = (changes: Partial<WidgetSnapshot> = {}): WidgetSnapshot => ({
 });
 const url = "storytime://";
 const day = (): AuthoritativeWidgetDay => ({
-  isDemo: false, totalRaisedCents: 250, answererCount: 40,
+  day: { isDemo: false, date: "2026-11-15" }, totalRaisedCents: 250, answererCount: 40,
   fruits: [{ isMine: true, golden: true, source: "whop" }, { isMine: false, golden: false, source: "whop" }, { isMine: true, golden: false, source: "demo" }],
   streaks: { isDemo: false, currency: "USD", undatedPaidCount: 0,
     clock: { now: at("06:00:00"), date: "2026-11-15", nextBoundaryAt: at("06:00:00") + 86_400_000 },
@@ -90,9 +90,15 @@ describe("verified query projection", () => {
     expect(snapshotFromVerifiedDay({ ...day(), totalRaisedCents: undefined })).toBeNull();
     expect(snapshotFromVerifiedDay({ isDemo: false })).toBeNull();
     expect(snapshotFromVerifiedDay({ ...day(), fruits: [null] })).toBeNull();
-    expect(snapshotFromVerifiedDay({ ...day(), isDemo: true })).toBeNull();
+    expect(snapshotFromVerifiedDay({ ...day(), day: { isDemo: true, date: "2026-11-15" } })).toBeNull();
     const input = day(); input.streaks.isDemo = true;
     expect(snapshotFromVerifiedDay(input)).toBeNull();
+  });
+  it("accepts the actual nested Today day DTO and rejects the old invented top-level flag", () => {
+    expect(snapshotFromVerifiedDay(day())?.giving.count).toBe(3);
+    const { day: nested, ...rest } = day();
+    expect(snapshotFromVerifiedDay({ ...rest, isDemo: nested.isDemo })).toBeNull();
+    expect(snapshotFromVerifiedDay({ ...day(), day: { isDemo: false, date: "2026-11-14" } })).toBeNull();
   });
   it("projects undated history as incomplete without leaking its lifetime amount", () => {
     const input = day(); input.streaks.undatedPaidCount = 2;

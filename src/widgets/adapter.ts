@@ -1,7 +1,7 @@
 import { isWidgetSnapshot, type GivingStatus, type WidgetSnapshot } from "./model";
 
 export type AuthoritativeWidgetDay = {
-  isDemo: boolean;
+  day: { date: string; isDemo: boolean };
   totalRaisedCents: number;
   answererCount: number;
   fruits: { isMine: boolean; golden: boolean; source: "whop" | "demo" }[];
@@ -17,11 +17,12 @@ export type AuthoritativeWidgetDay = {
 export function snapshotFromVerifiedDay(value: unknown): WidgetSnapshot | null {
   if (typeof value !== "object" || value === null) return null;
   const day = value as Partial<AuthoritativeWidgetDay>;
-  if (day.isDemo !== false || typeof day.totalRaisedCents !== "number" || typeof day.answererCount !== "number" ||
+  if (day.day?.isDemo !== false || typeof day.day.date !== "string" ||
+    typeof day.totalRaisedCents !== "number" || typeof day.answererCount !== "number" ||
     !day.streaks?.clock || !day.streaks.giving ||
     !Array.isArray(day.fruits) || !day.fruits.every((fruit) => typeof fruit === "object" && fruit !== null &&
       typeof fruit.isMine === "boolean" && typeof fruit.golden === "boolean" && ["whop", "demo"].includes(fruit.source)) ||
-    day.streaks.isDemo !== false ||
+    day.streaks.isDemo !== false || day.day.date !== day.streaks.clock.date ||
     day.streaks.currency !== "USD" || !Number.isSafeInteger(day.streaks.undatedPaidCount) ||
     day.streaks.undatedPaidCount < 0 || !Number.isSafeInteger(day.streaks.giving.totalCents) ||
     day.streaks.giving.totalCents < 0) return null;

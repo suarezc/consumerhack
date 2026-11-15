@@ -10,6 +10,14 @@ const root = path.resolve(__dirname, "..");
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "storytime-widgets-"));
 const originalConfig = fs.readFileSync(path.join(root, "app.json"));
 const base = JSON.parse(originalConfig).expo;
+const approvedPlan = process.argv.includes("--approved-plan");
+const identifiers = approvedPlan ? {
+  app: "com.charlessuarez.storytime", extension: "com.charlessuarez.storytime.widgets",
+  group: "group.com.charlessuarez.storytime.widgets", team: "432CDA2QK3",
+} : {
+  app: "example.storytime.localvalidation", extension: "example.storytime.localvalidation.widgets",
+  group: "group.example.storytime.localvalidation", team: undefined,
+};
 const excluded = new Set(["node_modules", ".git", ".expo", "ios", "android", "dist"]);
 function run(args, cwd = scratch) {
   const result = spawnSync(process.execPath, args, { cwd, stdio: "inherit", env: { ...process.env, CI: "1" } });
@@ -18,11 +26,11 @@ function run(args, cwd = scratch) {
 function config(enabled) {
   fs.writeFileSync(path.join(scratch, "app.json"), JSON.stringify({ expo: {
     ...base,
-    ios: { ...base.ios, bundleIdentifier: "example.storytime.localvalidation" },
+    ios: { ...base.ios, bundleIdentifier: identifiers.app, ...(identifiers.team ? { appleTeamId: identifiers.team } : {}) },
     plugins: [...base.plugins, ["./plugins/withStoryTimeWidgets.cjs", {
       enabled,
-      bundleIdentifier: "example.storytime.localvalidation.widgets",
-      groupIdentifier: "group.example.storytime.localvalidation",
+      bundleIdentifier: identifiers.extension,
+      groupIdentifier: identifiers.group,
     }]],
   } }, null, 2));
 }
@@ -44,7 +52,7 @@ try {
   const target = path.join(scratch, "ios/ExpoWidgetsTarget");
   const info = plist.parse(fs.readFileSync(path.join(target, "Info.plist"), "utf8"));
   assert.deepEqual(info.UIAppFonts, ["Bricolage.ttf", "Inter.ttf"]);
-  assert.equal(info.ExpoWidgetsAppGroupIdentifier, "group.example.storytime.localvalidation");
+  assert.equal(info.ExpoWidgetsAppGroupIdentifier, identifiers.group);
   const mainInfo = plist.parse(fs.readFileSync(path.join(scratch, "ios/storytime/Info.plist"), "utf8"));
   assert.ok(!mainInfo.UIAppFonts?.includes("Bricolage.ttf"));
   assert.ok(!mainInfo.UIAppFonts?.includes("Inter.ttf"));
@@ -68,8 +76,16 @@ try {
     assert.ok(fs.existsSync(path.join(scratch, "ios", resource.path.replaceAll('"', ""))));
   }
   const entitlements = plist.parse(fs.readFileSync(path.join(target, "ExpoWidgetsTarget.entitlements"), "utf8"));
-  assert.deepEqual(entitlements["com.apple.security.application-groups"], ["group.example.storytime.localvalidation"]);
+  assert.deepEqual(entitlements["com.apple.security.application-groups"], [identifiers.group]);
   assert.ok(!entitlements["aps-environment"]);
+  const rootEntitlements = plist.parse(fs.readFileSync(path.join(scratch, "ios/storytime/storytime.entitlements"), "utf8"));
+  assert.deepEqual(rootEntitlements["com.apple.security.application-groups"], [identifiers.group]);
+  const resolved = require("@expo/config").getConfig(scratch).exp;
+  const easTarget = resolved.extra.eas.build.experimental.ios.appExtensions.find((item) => item.targetName === "ExpoWidgetsTarget");
+  assert.deepEqual(easTarget, { targetName: "ExpoWidgetsTarget", bundleIdentifier: identifiers.extension,
+    entitlements: { "com.apple.security.application-groups": [identifiers.group] } });
+  if (approvedPlan) console.log(JSON.stringify({ localGenerationOnly: true, rootBundleIdentifier: identifiers.app,
+    appleTeamId: identifiers.team, rootEntitlements, extensionEntitlements: entitlements, easTarget }, null, 2));
   const registry = path.join(scratch, "registry.json");
   run([require.resolve("expo-widgets/package.json").replace("package.json", "scripts/build-layout-registry.mjs"), scratch, "ios", registry,
     path.join(target, "ExpoWidgetsLayoutRegistry.config.json")]);
