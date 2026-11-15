@@ -1,5 +1,7 @@
 # Widget-only artwork
 
+**Incomplete firefly checkpoint:** generated peach PNG/SVG resources have been removed from the in-progress source in favor of native shapes. The descriptions below record the historical implementation and need reconciliation on resumption; only the licensed font resources remain active. The original supplied HTML board and its saved reference render are untouched. This checkpoint is not ready for activation/native acceptance.
+
 Peach geometry, blossom, withered new bud, Lock Screen silhouettes and canopy are derived from the supplied `design/streak-fruit.html` in project Drive. The original board is unchanged. SVG sources are retained here; transparent PNGs are the offline illustration assets inside a native SwiftUI layout, not screenshots of a widget. Thirsty PNGs apply the board's saturation/brightness values at morning/afternoon/evening. No face; thirsty background is provided by the native layout.
 
 Widget maturity is green/small at 1, blush at 3, ripe at 7, gold at 30 (thresholds). This is different from the shared-tree's historical golden milestones **exactly 3/7/30**. The widget never recolors ledger fruits, and `goldenFruitCount` is projected from server facts, not its peach palette.

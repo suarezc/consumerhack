@@ -19,7 +19,7 @@ module.exports = function withStoryTimeWidgets(config, options = {}) {
     widgets: [{
       name: "StoryTimeGiving",
       displayName: "Your giving ritual",
-      description: "A peach for your giving streak and today's sandbox tree.",
+      description: "A quiet firefly for your giving streak and today's sandbox tree.",
       ios: {
         supportedFamilies: ["systemSmall", "systemMedium", "accessoryCircular"],
         contentMarginsDisabled: true,

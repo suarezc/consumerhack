@@ -13,16 +13,15 @@ export type WidgetSnapshot = {
   historyComplete: boolean;
   currency: "USD";
   sandbox: true;
-  fruitCount: number;
-  goldenFruitCount: number;
   totalRaisedCents: number;
   answererCount: number;
 };
 
 export type WidgetProps = {
-  state: "blossom" | "healthy" | "thirsty" | "withered" | "unavailable";
+  presentationVersion: 2;
+  state: "new" | "current" | "at_risk" | "ended" | "unavailable";
   count: number | null;
-  stage: 1 | 3 | 7 | 30;
+  tier: 1 | 3 | 7 | 30;
   fade: 0 | 1 | 2;
   freshness: "confirmed" | "aging" | "expired" | "missing";
   freshnessLabel: string;
@@ -31,10 +30,6 @@ export type WidgetProps = {
   totalLabel: string;
   answersLabel: string;
   url: string;
-  fruitImage: string | null;
-  lockImage: string | null;
-  lockOutlineImage: string | null;
-  treeImage: string | null;
 };
 
 export type WidgetEntry = { date: Date; props: WidgetProps };
@@ -45,12 +40,11 @@ export function ritualDayKey(now: number): string {
 
 export function emptyWidget(url: string): WidgetProps {
   return {
-    state: "unavailable", count: null, stage: 1, fade: 0,
+    presentationVersion: 2, state: "unavailable", count: null, tier: 1, fade: 0,
     freshness: "missing", freshnessLabel: "Open StoryTime to refresh", expiresAt: null,
-    message: "Your giving ritual, one day at a time.",
+    message: "Your giving light, one day at a time.",
     totalLabel: "—", answersLabel: "Open today's tree",
     url,
-    fruitImage: null, lockImage: null, lockOutlineImage: null, treeImage: null,
   };
 }
 
@@ -63,7 +57,6 @@ export function isWidgetSnapshot(value: unknown): value is WidgetSnapshot {
     typeof s.hasPriorGiving !== "boolean" || typeof s.historyComplete !== "boolean" ||
     s.currency !== "USD" || s.sandbox !== true || !s.giving || !integer(s.giving.count) ||
     !["current", "at_risk", "none"].includes(s.giving.status) ||
-    !integer(s.fruitCount) || !integer(s.goldenFruitCount) || s.goldenFruitCount > s.fruitCount ||
     !integer(s.totalRaisedCents) || !integer(s.answererCount)) return false;
   if (s.asOf > 8.64e15 || s.nextBoundaryAt > 8.64e15) return false;
   const start = Date.parse(`${s.dayKey}T06:00:00.000Z`);
@@ -80,8 +73,7 @@ export function widgetAt(snapshot: WidgetSnapshot | null, now: number, url: stri
   }
   if (!snapshot.historyComplete) return { ...empty, message: "Giving history needs a refresh." };
   const { count, status } = snapshot.giving;
-  const state = status === "current" ? "healthy" : status === "at_risk" ? "thirsty" :
-    snapshot.hasPriorGiving ? "withered" : "blossom";
+  const state = status === "none" ? (snapshot.hasPriorGiving ? "ended" : "new") : status;
   const elapsed = now - (snapshot.nextBoundaryAt - RITUAL_DAY_MS);
   const fade = elapsed >= 16 * 3_600_000 ? 2 : elapsed >= 8 * 3_600_000 ? 1 : 0;
   const aging = now - snapshot.asOf >= AGING_MS;
@@ -89,12 +81,11 @@ export function widgetAt(snapshot: WidgetSnapshot | null, now: number, url: stri
   return {
     ...empty, state, count, fade,
     expiresAt: snapshot.nextBoundaryAt,
-    stage: count >= 30 ? 30 : count >= 7 ? 7 : count >= 3 ? 3 : 1,
+    tier: count >= 30 ? 30 : count >= 7 ? 7 : count >= 3 ? 3 : 1,
     freshness: aging ? "aging" : "confirmed",
     freshnessLabel: `${aging ? "Last synced" : "As of"} ${time} UTC`,
-    message: state === "healthy" ? "Watered today." : state === "thirsty" ?
-      "Thirsty. Open to answer, then water." : state === "withered" ?
-        "A new bud. Begin again today." : "Answer, then water your first fruit.",
+    message: state === "current" ? "Gave today." : state === "at_risk" ?
+      "Continue today" : state === "ended" ? "Begin again" : "Start today",
     totalLabel: `$${(snapshot.totalRaisedCents / 100).toFixed(2)}`,
     answersLabel: `${snapshot.answererCount} answered`,
   };

@@ -99,35 +99,49 @@ try {
   vm.runInContext(fs.readFileSync(runtime, "utf8"), context);
   context.__expoWidgetLayout = vm.runInContext(`(${registered.layout})`, context);
   let layouts = 0;
-  for (const state of ["blossom", "healthy", "thirsty", "withered", "unavailable"]) {
+  for (const state of ["new", "current", "at_risk", "ended", "unavailable"]) {
     for (const family of ["systemSmall", "systemMedium", "accessoryCircular"]) {
       for (const colorScheme of ["light", "dark"]) {
         for (const reduced of [false, true]) {
-          const props = { ...registered.initialProps, state, count: state === "unavailable" ? null : 6,
-            fruitImage: state === "unavailable" ? null : "file:///illustration.png",
-            lockImage: state === "unavailable" ? null : "file:///lock.png", lockOutlineImage: "file:///outline.png",
-            treeImage: "file:///tree.png", message: "Fixture query facts", totalLabel: "$2.50", answersLabel: "40 answered" };
-          const node = context.__expoWidgetRender(props, {
+          for (const tier of [1, 3, 7, 30]) {
+            for (const fade of [0, 1, 2]) {
+              const props = { ...registered.initialProps, state, count: state === "unavailable" ? null : 6,
+                tier, fade, message: "Fixture query facts", totalLabel: "$2.50", answersLabel: "40 answered" };
+              const node = context.__expoWidgetRender(props, {
             widgetFamily: family, colorScheme, isLuminanceReduced: reduced,
             widgetRenderingMode: family === "accessoryCircular" ? "vibrant" : "fullColor",
-          });
-          assert.ok(node && typeof node === "object");
-          const serialized = JSON.stringify(node);
-          assert.ok(serialized.includes("storytime://"));
-          assert.ok(serialized.includes("containerBackground"));
-          assert.ok(!serialized.includes("RedBoxView"));
-          if (family === "systemMedium") assert.ok(serialized.includes("S.A.C.K."));
-          layouts += 1;
+              });
+              assert.ok(node && typeof node === "object");
+              const serialized = JSON.stringify(node);
+              assert.ok(serialized.includes("storytime://"));
+              assert.ok(serialized.includes("containerBackground"));
+              assert.ok(!serialized.includes("RedBoxView"));
+              assert.ok(!serialized.includes("uiImage"));
+              assert.ok(!/peach|withered|thirsty|blossom/.test(serialized));
+              if (family === "systemMedium") assert.ok(serialized.includes("S.A.C.K."));
+              if (family === "accessoryCircular") {
+                assert.ok((serialized.match(/giving-spark-/g) ?? []).length <= 2);
+                assert.ok(!serialized.includes("giving-halo"));
+                assert.ok(!/Gradient|ProgressView|Gauge/.test(serialized));
+              }
+              layouts += 1;
+            }
+          }
         }
       }
     }
   }
   const expired = JSON.stringify(context.__expoWidgetRender({ ...registered.initialProps,
-    state: "healthy", count: 7, expiresAt: 1, totalLabel: "$123.45", fruitImage: "file:///old.png" },
+    state: "current", count: 7, expiresAt: 1, totalLabel: "$123.45" },
   { widgetFamily: "systemMedium", colorScheme: "light" }));
   assert.ok(expired.includes("Open StoryTime to refresh"));
   assert.ok(!expired.includes("$123.45"));
-  assert.ok(!expired.includes("file:///old.png"));
+  const oldPresentation = JSON.stringify(context.__expoWidgetRender({ ...registered.initialProps,
+    presentationVersion: 1, state: "healthy", count: 7, totalLabel: "$123.45", fruitImage: "file:///old.png" },
+  { widgetFamily: "systemMedium", colorScheme: "light" }));
+  assert.ok(oldPresentation.includes("Open StoryTime to refresh"));
+  assert.ok(!oldPresentation.includes("$123.45"));
+  assert.ok(!oldPresentation.includes("file:///old.png"));
   assert.equal(fs.readFileSync(path.join(root, "app.json"), "utf8"), originalConfig.toString());
   console.log(`Widget disabled/enabled prebuild, extension resources and ${layouts} layouts evaluated in the published isolated JS runtime. This checks native view descriptions, not native rendering. No native compilation or signing performed.`);
 } finally {

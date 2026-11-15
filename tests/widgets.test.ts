@@ -9,13 +9,12 @@ const at = (time: string) => Date.parse(`2026-11-15T${time}Z`);
 const snapshot = (changes: Partial<WidgetSnapshot> = {}): WidgetSnapshot => ({
   version: 1, asOf: at("06:00:00"), dayKey: "2026-11-15", nextBoundaryAt: at("06:00:00") + 86_400_000,
   giving: { count: 6, status: "at_risk" }, hasPriorGiving: true, historyComplete: true,
-  currency: "USD", sandbox: true, fruitCount: 0, goldenFruitCount: 0, totalRaisedCents: 4150, answererCount: 212,
+  currency: "USD", sandbox: true, totalRaisedCents: 4150, answererCount: 212,
   ...changes,
 });
 const url = "storytime://";
 const day = (): AuthoritativeWidgetDay => ({
   day: { isDemo: false, date: "2026-11-15" }, totalRaisedCents: 250, answererCount: 40,
-  fruits: [{ isMine: true, golden: true, source: "whop" }, { isMine: false, golden: false, source: "whop" }, { isMine: true, golden: false, source: "demo" }],
   streaks: { isDemo: false, currency: "USD", undatedPaidCount: 0,
     clock: { now: at("06:00:00"), date: "2026-11-15", nextBoundaryAt: at("06:00:00") + 86_400_000 },
     giving: { count: 3, status: "current", totalCents: 500 } },
@@ -23,14 +22,15 @@ const day = (): AuthoritativeWidgetDay => ({
 
 describe("giving widget presentation (not an authoritative counter)", () => {
   it.each([
-    ["current", 6, true, "healthy"], ["at_risk", 6, true, "thirsty"],
-    ["none", 0, false, "blossom"], ["none", 0, true, "withered"],
+    ["current", 6, true, "current"], ["at_risk", 6, true, "at_risk"],
+    ["none", 0, false, "new"], ["none", 0, true, "ended"],
   ] as const)("renders %s with prior=%s", (status, count, prior, state) => {
     expect(widgetAt(snapshot({ giving: { status, count }, hasPriorGiving: prior }), at("07:00:00"), url).state).toBe(state);
   });
-  it.each([[0, 1], [1, 1], [2, 1], [3, 3], [6, 3], [7, 7], [29, 7], [30, 30], [31, 30]] as const)("maps %i days to maturity %i without changing gold facts", (count, stage) => {
-    const props = widgetAt(snapshot({ giving: { status: count ? "current" : "none", count }, goldenFruitCount: 1, fruitCount: 1 }), at("07:00:00"), url);
-    expect(props.stage).toBe(stage);
+  it.each([[0, 1], [1, 1], [2, 1], [3, 3], [6, 3], [7, 7], [29, 7], [30, 30], [31, 30]] as const)("maps %i giving days to constellation tier %i", (count, tier) => {
+    const props = widgetAt(snapshot({ giving: { status: count ? "current" : "none", count } }), at("07:00:00"), url);
+    expect(props.tier).toBe(tier);
+    expect(props).not.toHaveProperty("fruitCount");
     expect(props).not.toHaveProperty("goldenFruitCount");
   });
   it.each([false, true])("incomplete legacy history is neutral with prior=%s", (hasPriorGiving) => {
@@ -55,7 +55,7 @@ describe("giving widget presentation (not an authoritative counter)", () => {
   });
   it("never rolls today's confirmed watering into tomorrow's streak or broken state", () => {
     const s = snapshot({ giving: { count: 7, status: "current" } });
-    expect(widgetAt(s, s.nextBoundaryAt - 1, url).state).toBe("healthy");
+    expect(widgetAt(s, s.nextBoundaryAt - 1, url).state).toBe("current");
     expect(widgetAt(s, s.nextBoundaryAt, url).state).toBe("unavailable");
     expect(widgetAt(s, s.nextBoundaryAt + 86_400_000, url).count).toBeNull();
   });
@@ -69,16 +69,26 @@ describe("giving widget presentation (not an authoritative counter)", () => {
   it("fails closed for missing, future, malformed or expired snapshots", () => {
     expect(widgetAt(null, at("07:00:00"), url).count).toBeNull();
     expect(widgetAt(snapshot(), at("05:59:59"), url).count).toBeNull();
-    for (const bad of [snapshot({ totalRaisedCents: -1 }), snapshot({ asOf: Infinity }), snapshot({ dayKey: "2026-02-31" }), snapshot({ goldenFruitCount: 2 }), snapshot({ giving: { status: "none", count: 4 } }), snapshot({ currency: "EUR" as "USD" })]) {
+    for (const bad of [snapshot({ totalRaisedCents: -1 }), snapshot({ asOf: Infinity }), snapshot({ dayKey: "2026-02-31" }), snapshot({ answererCount: NaN }), snapshot({ giving: { status: "none", count: 4 } }), snapshot({ currency: "EUR" as "USD" })]) {
       expect(isWidgetSnapshot(bad)).toBe(false);
     }
   });
 });
 
 describe("verified query projection", () => {
-  it("copies server cents, count, own paid fruit and historical gold without ledger arithmetic", () => {
+  it("does not read or project response fruit data", () => {
+    const expected = snapshotFromVerifiedDay(day());
+    for (const fruits of [undefined, null, [], [null], [{ fruitId: "response-only", golden: true }]]) {
+      expect(snapshotFromVerifiedDay({ ...day(), fruits })).toEqual(expected);
+    }
+    const withGetter = Object.defineProperty(day(), "fruits", { get() { throw new Error("Response fruits must not be read"); } });
+    expect(snapshotFromVerifiedDay(withGetter)).toEqual(expected);
+    expect(expected).not.toHaveProperty("fruitCount");
+    expect(expected).not.toHaveProperty("goldenFruitCount");
+  });
+  it("copies only server cents and giving count without ledger or response arithmetic", () => {
     expect(snapshotFromVerifiedDay(day())).toMatchObject({ totalRaisedCents: 250, answererCount: 40,
-      giving: { count: 3, status: "current" }, fruitCount: 1, goldenFruitCount: 1, hasPriorGiving: true, historyComplete: true });
+      giving: { count: 3, status: "current" }, hasPriorGiving: true, historyComplete: true });
   });
   it("strips identity, provider metadata, lifetime amount and event IDs", () => {
     const input = { ...day(), deviceId: "bearer-secret", providerId: "provider-secret", inviteCode: "ABCDEF", wateringEvent: { id: "not-for-widget" } };
@@ -89,7 +99,6 @@ describe("verified query projection", () => {
     expect(snapshotFromVerifiedDay(null)).toBeNull();
     expect(snapshotFromVerifiedDay({ ...day(), totalRaisedCents: undefined })).toBeNull();
     expect(snapshotFromVerifiedDay({ isDemo: false })).toBeNull();
-    expect(snapshotFromVerifiedDay({ ...day(), fruits: [null] })).toBeNull();
     expect(snapshotFromVerifiedDay({ ...day(), day: { isDemo: true, date: "2026-11-15" } })).toBeNull();
     const input = day(); input.streaks.isDemo = true;
     expect(snapshotFromVerifiedDay(input)).toBeNull();
@@ -106,13 +115,26 @@ describe("verified query projection", () => {
     expect(s.historyComplete).toBe(false);
     expect(widgetAt(s, s.asOf, url).state).toBe("unavailable");
   });
-  it("duplicate and late-paid query results replace facts rather than incrementing fruit or streak", () => {
+  it("duplicate and late-paid query results replace facts rather than incrementing a streak", () => {
     const input = day(); const first = snapshotFromVerifiedDay(input)!;
     expect(snapshotFromVerifiedDay(input)).toEqual(first);
     input.totalRaisedCents = 500;
-    expect(snapshotFromVerifiedDay(input)).toMatchObject({ totalRaisedCents: 500, giving: first.giving, fruitCount: 1 });
+    expect(snapshotFromVerifiedDay(input)).toMatchObject({ totalRaisedCents: 500, giving: first.giving });
     input.streaks.giving = { ...input.streaks.giving, count: 4, status: "current" };
     expect(snapshotFromVerifiedDay(input)?.giving.count).toBe(4);
+  });
+});
+
+describe("giving light presentation", () => {
+  it.each([
+    ["current", 3, true, "Gave today."], ["at_risk", 3, true, "Continue today"],
+    ["none", 0, false, "Start today"], ["none", 0, true, "Begin again"],
+  ] as const)("uses giving-light copy for %s without response-fruit semantics", (status, count, hasPriorGiving, message) => {
+    const props = widgetAt(snapshot({ giving: { count, status }, hasPriorGiving }), at("07:00:00"), url);
+    expect(props.message).toBe(message);
+    expect(props.presentationVersion).toBe(2);
+    for (const field of ["fruitImage", "lockImage", "lockOutlineImage", "treeImage"]) expect(props).not.toHaveProperty(field);
+    expect(JSON.stringify(props)).not.toMatch(/peach|wither|thirst|blossom|dead|broken/i);
   });
 });
 
@@ -160,7 +182,7 @@ describe("native timeline synchronization", () => {
     const { sync, transport } = setup();
     await sync.publish(snapshot());
     expect(await sync.clear()).toBe("cleared");
-    expect(transport.updateSnapshot).toHaveBeenLastCalledWith(expect.objectContaining({ count: null, fruitImage: null, totalLabel: "—" }));
+    expect(transport.updateSnapshot).toHaveBeenLastCalledWith(expect.objectContaining({ count: null, totalLabel: "—" }));
     expect(await sync.publish(snapshot())).toBe("updated");
     expect(await sync.publish(null)).toBe("cleared");
   });
