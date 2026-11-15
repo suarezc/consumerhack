@@ -1,0 +1,18 @@
+project:
+  id: ad0d47ad-720e-4adf-b12a-ad8cf6d73fb8
+session:
+  idle_timeout_seconds: 1800
+build:
+  framework: expo
+  profiles:
+    preview:
+      ios:
+        app_id: ca8160bd-e3f2-45a4-bd15-949eb2e8eac2
+        setup_commands:
+          - npm ci
+          - CI=1 npx expo prebuild --platform ios --no-install
+          - cd ios && pod install
+        build_commands:
+          - cd ios && xcodebuild -workspace storytime.xcworkspace -scheme storytime -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build ARCHS=arm64
+        output_path: ios/build/Build/Products/Release-iphonesimulator/storytime.app
+        timeout_seconds: 3600
