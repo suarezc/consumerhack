@@ -1,4 +1,4 @@
-export type WateringEvent = Readonly<{ id: string; fruitId: string; revision: number }>;
+export type WateringEvent = Readonly<{ id: string; fruitId: string; fruitIds?: readonly string[]; revision: number }>;
 export type GivingEvent = Readonly<{ id: string; baselineId: string; givingCount: number; isDemo: boolean }>;
 export type WateringDispatch = Readonly<{
   contextId: string | null;
@@ -38,13 +38,15 @@ export function createWateringObserver(createBaselineId: () => string) {
         publish({ contextId: nextContext, baselineId: createBaselineId(), treeEvent: null, feedbackEvent: null });
         return;
       }
-      if (!event || event.revision !== 1 || !confirmedFruitIds.includes(event.fruitId) || consumed.has(event.id)) return;
+      if (!event || event.revision !== 1 || consumed.has(event.id)) return;
+      const fruitIds = event.fruitIds ?? [event.fruitId];
+      if (!fruitIds.length || fruitIds[0] !== event.fruitId || new Set(fruitIds).size !== fruitIds.length || !fruitIds.every((id) => confirmedFruitIds.includes(id))) return;
       consumed.add(event.id);
       const baselineId = snapshot.baselineId!;
       publish({
         contextId: nextContext,
         baselineId,
-        treeEvent: Object.freeze({ ...event }),
+        treeEvent: Object.freeze({ ...event, ...(event.fruitIds ? { fruitIds: Object.freeze([...fruitIds]) } : {}) }),
         feedbackEvent: Number.isSafeInteger(givingCount) && givingCount >= 0
           ? Object.freeze({ id: event.id, baselineId, givingCount, isDemo }) : null,
       });
