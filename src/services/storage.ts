@@ -4,5 +4,7 @@ const key = "storytime.session.v1";
 
 export const sessionStorage = {
   getItem: () => SecureStore.getItemAsync(key),
-  setItem: (value: string) => SecureStore.setItemAsync(key, value),
+  setItem: (value: string) => SecureStore.setItemAsync(key, value, {
+    keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+  }),
 };

@@ -26,6 +26,23 @@ test("chosen tree survives restart and switching preserves identity", async () =
   assert.deepEqual(await store.selectTree(null), { deviceId: "identity", treeId: null });
 });
 
+test("independent web stores serialize first launch through a shared lock", async () => {
+  let queue = Promise.resolve();
+  const storage = {
+    ...memory(),
+    withLock(action) {
+      const result = queue.then(action);
+      queue = result.catch(() => {});
+      return result;
+    },
+  };
+  const firstTab = createSessionStore(storage, () => "tab-a");
+  const secondTab = createSessionStore(storage, () => "tab-b");
+  const [first, second] = await Promise.all([firstTab.load(), secondTab.load()]);
+  assert.deepEqual(first, second);
+  assert.deepEqual(await createSessionStore(storage, () => "wrong").load(), first);
+});
+
 test("unreadable or corrupt storage never silently replaces identity", async () => {
   for (const invalid of ["invalid-json", "{}", '{"deviceId":"","treeId":null}']) {
     let writes = 0;

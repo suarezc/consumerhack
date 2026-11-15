@@ -6,6 +6,7 @@ export type Session = {
 export type SessionStorage = {
   getItem: () => Promise<string | null>;
   setItem: (value: string) => Promise<void>;
+  withLock?: <T>(action: () => Promise<T>) => Promise<T>;
 };
 
 export function createSessionStore(storage: SessionStorage, createId: () => string) {
@@ -14,7 +15,7 @@ export function createSessionStore(storage: SessionStorage, createId: () => stri
   return {
     load(): Promise<Session> {
       if (!pending) {
-        pending = (async () => {
+        const readOrCreate = async () => {
           const stored = await storage.getItem();
           if (stored !== null) {
             const value: unknown = JSON.parse(stored);
@@ -30,7 +31,8 @@ export function createSessionStore(storage: SessionStorage, createId: () => stri
           const session = { deviceId: createId(), treeId: null };
           await storage.setItem(JSON.stringify(session));
           return session;
-        })().catch((error: unknown) => {
+        };
+        pending = (storage.withLock ? storage.withLock(readOrCreate) : readOrCreate()).catch((error: unknown) => {
           pending = undefined;
           throw error;
         });
