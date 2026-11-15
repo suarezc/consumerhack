@@ -51,12 +51,12 @@ export function WateringComposer({ today, onClose }: {
   return <Panel title="A little care, together." onClose={() => { if (!busy) onClose(); }}>
     <StoryText color="#f6efe6">{today.charity.name}</StoryText>
     <StoryText variant="caption" color="#ffd27a">{today.day.isDemo ? "Demo · sample money · no charge" : "Sandbox checkout · test payments only · no real donation or payout is established"}</StoryText>
-    {!checkoutUrl && <WateringBundles selected={bundles} onSelect={(next) => {
+    {!checkoutUrl && <WateringBundles selectedBundles={bundles} onSelectBundles={(next) => {
       if (pending.current) return;
       setBundles(next);
       if (next !== bundles) demoRequest.reset();
       setError("");
-    }} onWater={() => { void prepare(); }} canWater={today.myAnswer !== null} loading={busy} error={error} />}
+    }} onWater={() => { void prepare(); }} canWater={today.myAnswer !== null} loading={busy} error={error} isDemo={today.day.isDemo} />}
     {checkoutUrl && <StoryButton label="Open secure sandbox checkout" loading={busy} onPress={() => {
       setBusy(true);
       setError("");

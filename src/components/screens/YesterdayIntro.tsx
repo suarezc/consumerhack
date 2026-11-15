@@ -1,9 +1,12 @@
 import { useMutation } from "convex/react";
 import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import * as WebBrowser from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
+import { View } from "react-native";
 
 import { Tree } from "@/components/Tree";
-import { StoryText, YesterdayImpact } from "@/design";
+import { StoryScreen, StoryText, YesterdayImpact, useStoryTime } from "@/design";
 import type { FirstOpen } from "@/providers/RitualProvider";
 import { useSession } from "@/providers/SessionProvider";
 import { api, type Id } from "@/services/api";
@@ -11,6 +14,7 @@ import { mutationError } from "@/services/errors";
 
 export function YesterdayIntro({ intro, treeId }: { intro: FirstOpen; treeId: Id<"trees"> }) {
   const { session } = useSession();
+  const { theme } = useStoryTime();
   const acknowledge = useMutation(api.days.acknowledgeYesterday);
   const pending = useRef(false);
   const active = useRef(true);
@@ -39,10 +43,15 @@ export function YesterdayIntro({ intro, treeId }: { intro: FirstOpen; treeId: Id
     }
   }
 
-  return <YesterdayImpact impact={yesterday} onToday={() => { void continueToday(); }} loading={busy} error={error}>
+  return <View nativeID="story-secondary-safe-area" style={{ flex: 1 }}>
+    <StatusBar style={theme.text === theme.paper ? "light" : "dark"} />
+    <StoryScreen><YesterdayImpact impact={yesterday} onToday={() => { void continueToday(); }} error={error}
+      onOpenLink={(url) => { void WebBrowser.openBrowserAsync(url).catch(() => {
+        if (active.current) setError("The charity website couldn’t open. Please try again.");
+      }); }}>
     <Tree key={yesterday.dayId} timeOfDay={1} answers={yesterday.answererCount} mine={[]} notes={[]} lanterns={0}
       fruits={yesterday.fruits.map((fruit) => ({ id: fruit.fruitId, golden: fruit.golden, mine: fruit.isMine }))}
       wateringEvent={null} style={{ height: 280 }} />
-    <StoryText variant="caption">{yesterday.isDemo ? "Sample gross total · no real money" : "Sandbox gross total · not net charity proceeds. No real donation or payout is established."}</StoryText>
-  </YesterdayImpact>;
+    {busy && <StoryText variant="caption">Opening today’s question…</StoryText>}
+  </YesterdayImpact></StoryScreen></View>;
 }
