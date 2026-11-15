@@ -39,13 +39,15 @@ export type TodayCharitySummaryProps = {
 export function TodayCharitySummary({ charity, totalRaisedCents, isDemo, onShowDetails, error }: TodayCharitySummaryProps) {
   const { theme } = useStoryTime();
   return <View style={styles.compactSummary}>
-    <Pressable accessibilityRole="button" accessibilityLabel={charity ? `About ${charity.name}` : 'About the charity'} disabled={!charity}
-      onPress={onShowDetails} style={styles.charityLink}>
-      <StoryText variant="caption" color={theme.ink} style={styles.charityName}>{charity ? `For ${charity.name}` : 'Gathering today’s charity…'}</StoryText>
-      <StoryText variant="caption" color={theme.ink} style={styles.compactAmount}> · {error ? 'Total unavailable' : totalRaisedCents === null ? 'Gathering paid total…' : `${charityAmount(totalRaisedCents)} today`}</StoryText>
-    </Pressable>
-    {!!error && <StoryText accessibilityRole="alert" variant="caption" color={theme.ink}>{error}</StoryText>}
-    <StoryText variant="caption" color={theme.ink} style={styles.disclosure}>{isDemo ? 'Sample giving · no charge or real charity payout' : 'Sandbox example · gross total, not a real charity payout'}</StoryText>
+    <View style={styles.charityLink}>
+      <Pressable accessibilityRole="button" accessibilityLabel={charity ? `About ${charity.name}` : 'About the charity'} disabled={!charity}
+        onPress={onShowDetails} style={{ minHeight: 44, justifyContent: 'center' }}>
+        <StoryText variant="caption" color={theme.text} style={styles.charityName}>{charity ? `For ${charity.name}` : 'Gathering today’s charity…'}</StoryText>
+      </Pressable>
+      <StoryText variant="caption" color={theme.text} style={styles.compactAmount}> · {error ? 'Total unavailable' : totalRaisedCents === null ? 'Gathering paid total…' : `${charityAmount(totalRaisedCents)} today`}</StoryText>
+    </View>
+    {!!error && <StoryText accessibilityRole="alert" variant="caption" color={theme.text}>{error}</StoryText>}
+    <StoryText variant="caption" color={theme.text} style={styles.disclosure}>{isDemo ? 'Sample giving · no charge or real charity payout' : 'Sandbox example · gross total, not a real charity payout'}</StoryText>
   </View>;
 }
 
