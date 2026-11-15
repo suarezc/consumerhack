@@ -92,7 +92,7 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
       </View>}
     </AnswerCard>
     )}>
-    {today.day.isDemo && <StoryText variant="meta" color="#ffd27a">Demo day · sample answers join your real answer</StoryText>}
+    {today.day.isDemo && <StoryText variant="meta" color="#ffd27a" style={{ backgroundColor: "rgba(9,12,34,0.8)", padding: 6 }}>Demo day · sample answers join your real answer</StoryText>}
     {canAnswer && <StoryButton label="Add my answer" onPress={() => { setError(""); setComposer(true); }} />}
     {today.myAnswer && !unlocked && <StoryText color="#f6efe6">Your blossom is on the tree. The answers open when everyone has answered, or at bloom time.</StoryText>}
     {!today.myAnswer && !canAnswer && <StoryText color="#f6efe6">{now < today.day.opensAt ? "The question opens soon." : "This day has closed. Come back for tomorrow’s question."}</StoryText>}
