@@ -1,5 +1,5 @@
 import { type ComponentRef, type ReactNode, useCallback, useEffect, useId, useRef, useState } from 'react';
-import { Animated, BackHandler, Easing, Platform, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { AccessibilityInfo, Animated, BackHandler, Easing, Platform, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { StoryButton, StoryText } from './primitives';
@@ -21,9 +21,17 @@ export type AnswerCardProps = {
   children?: ReactNode;
 };
 
+function describeAnswer(answer: StoryAnswer) {
+  return `${answer.isMine ? 'Your answer' : answer.author}: ${answer.text}`;
+}
+
 export function AnswerCard(props: AnswerCardProps) {
-  if (!props.open || !props.answer) return null;
-  return <AnswerCardFrame {...props} answer={props.answer} />;
+  return <>
+    {Platform.OS === 'web' && <View aria-live="polite" style={styles.announcement}>
+      <Text>{props.open && props.answer ? describeAnswer(props.answer) : ''}</Text>
+    </View>}
+    {props.open && props.answer && <AnswerCardFrame {...props} answer={props.answer} />}
+  </>;
 }
 
 function AnswerCardFrame(props: AnswerCardProps & { answer: StoryAnswer }) {
@@ -33,7 +41,7 @@ function AnswerCardFrame(props: AnswerCardProps & { answer: StoryAnswer }) {
     setBounds((previous) => previous.width === width && previous.height === height ? previous : { width, height });
   }}>
     {bounds.height > 0 && <AnswerCardContent
-      key={`${props.answer.id}:${bounds.width}:${bounds.height}:${props.origin?.x}:${props.origin?.y}:${props.controlsHeight}`}
+      key={props.answer.id}
       {...props} availableHeight={bounds.height} />}
   </View>;
 }
@@ -53,15 +61,20 @@ function AnswerCardContent({ answer, origin, controlsHeight = 120, onClose, onNo
   const originY = origin?.y;
   const bandHeight = Number.isFinite(controlsHeight) ? Math.max(0, controlsHeight) : 120;
   const bottom = Math.max(insets.bottom, Math.min(bandHeight, availableHeight * 0.6)) + 18;
+  const announcement = describeAnswer(answer);
   const dismiss = useCallback(() => {
     if (Platform.OS === 'web' && document.getElementById(cardId)?.contains(document.activeElement)) opener.current?.focus();
     onClose();
   }, [cardId, onClose]);
 
   function reveal() {
-    if (measured.current) return;
+    const remeasuring = measured.current;
+    if (remeasuring) {
+      progress.stopAnimation();
+      progress.setValue(1);
+    }
     card.current?.measureInWindow((x, y, cardWidth, cardHeight) => {
-      if (measured.current) return;
+      if (!remeasuring && measured.current) return;
       measured.current = true;
       const anchored = !reducedMotion && Number.isFinite(originX) && Number.isFinite(originY)
         && originX! >= 0 && originX! <= width && originY! >= 0 && originY! <= height;
@@ -100,6 +113,10 @@ function AnswerCardContent({ answer, origin, controlsHeight = 120, onClose, onNo
   }, [dismiss]);
 
   useEffect(() => {
+    if (Platform.OS === 'ios') AccessibilityInfo.announceForAccessibilityWithOptions(announcement, { queue: true, priority: 'low' });
+  }, [announcement]);
+
+  useEffect(() => {
     if (!offset) return;
     const animation = Animated.timing(progress, {
       toValue: 1,
@@ -125,7 +142,9 @@ function AnswerCardContent({ answer, origin, controlsHeight = 120, onClose, onNo
           ],
         }]}>
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.cardContent}>
-          <StoryText variant="question" color={theme.paper} style={styles.answer}>{answer.text}</StoryText>
+          <StoryText variant="question" color={theme.paper} style={styles.answer}
+            accessibilityLiveRegion={Platform.OS === 'android' ? 'polite' : undefined}
+            accessibilityLabel={announcement}>{answer.text}</StoryText>
           <View style={styles.heading}>
             <StoryText variant="meta" color={answer.isMine ? theme.lantern : theme.muted} style={styles.author}>
               {answer.isMine ? 'Your blossom' : answer.author}
@@ -145,6 +164,7 @@ function AnswerCardContent({ answer, origin, controlsHeight = 120, onClose, onNo
 }
 
 const styles = StyleSheet.create({
+  announcement: { position: 'absolute', left: -1, top: 0, width: 1, height: 1, overflow: 'hidden' },
   overlay: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, paddingHorizontal: 20, justifyContent: 'flex-end', alignItems: 'center' },
   cardHost: { width: '100%', maxWidth: 416, flexShrink: 1 },
   card: { borderWidth: 1, overflow: 'hidden', flexShrink: 1 },
