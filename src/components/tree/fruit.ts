@@ -4,7 +4,8 @@ import { TREE_MAX_ID_LENGTH } from "./limits";
 const validId = (value: unknown): value is string =>
   typeof value === "string" &&
   value.length > 0 &&
-  value.length <= TREE_MAX_ID_LENGTH;
+  value.length <= TREE_MAX_ID_LENGTH &&
+  /^[\x00-\x7f]+$/.test(value);
 
 export function normalizeFruits(value: unknown): TreeFruit[] {
   if (!Array.isArray(value)) return [];

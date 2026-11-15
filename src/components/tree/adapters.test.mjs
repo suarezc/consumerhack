@@ -29,6 +29,9 @@ function adapter(web) {
   const listeners = new Map();
   let cursor = 0;
   let node;
+  let root;
+  let renderPending = false;
+  let failSend = false;
   const useCallback = (value, dependencies) => {
     const index = cursor++;
     const previous = slots[index];
@@ -56,7 +59,15 @@ function adapter(web) {
       });
     }
   };
-  const childWindow = { postMessage: (data) => sent.push(JSON.parse(data)) };
+  const childWindow = {
+    postMessage: (data) => {
+      if (failSend) {
+        failSend = false;
+        throw new Error("fixture send failed");
+      }
+      sent.push(JSON.parse(data));
+    },
+  };
   const window = {
     addEventListener: (name, listener) => listeners.set(name, listener),
     removeEventListener: (name) => listeners.delete(name),
@@ -67,6 +78,20 @@ function adapter(web) {
     removeEventListener() {},
   };
   const react = {
+    useState: (initial) => {
+      const index = cursor++;
+      if (!slots[index])
+        slots[index] = {
+          value: initial,
+          set(value) {
+            if (!Object.is(slots[index].value, value)) {
+              slots[index].value = value;
+              renderPending = true;
+            }
+          },
+        };
+      return [slots[index].value, slots[index].set];
+    },
     useRef: (value) => {
       const index = cursor++;
       return slots[index] ?? (slots[index] = { current: value });
@@ -89,10 +114,15 @@ function adapter(web) {
   };
   const dependencies = {
     react,
-    "react/jsx-runtime": { jsx: (type, props) => ({ type, props }) },
+    "react/jsx-runtime": {
+      jsx: (type, props) => ({ type, props }),
+      jsxs: (type, props) => ({ type, props }),
+    },
     "react-native": rn,
     "react-native-webview": { WebView: "WebView" },
     "./tree/bridge": bridge,
+    "./tree/limits": limits,
+    "./tree/TreeDataError": { TreeDataError: "TreeDataError" },
     "./tree/html": { TREE_HTML: "<script></script>" },
   };
   const source = readFileSync(
@@ -114,11 +144,17 @@ function adapter(web) {
   };
   vm.runInNewContext(code, context);
   const render = (props) => {
-    cursor = 0;
-    node = context.exports.Tree(props).props.children;
-    node.props.ref.current = web ? { contentWindow: childWindow } : childWindow;
-    while (layout.length) layout.shift()();
-    while (effects.length) effects.shift()();
+    do {
+      renderPending = false;
+      cursor = 0;
+      root = context.exports.Tree(props);
+      node = root.props.children[0];
+      node.props.ref.current = web
+        ? { contentWindow: childWindow }
+        : childWindow;
+      while (layout.length) layout.shift()();
+      while (effects.length) effects.shift()();
+    } while (renderPending);
   };
   const deliver = (message) => {
     const data = JSON.stringify(message);
@@ -126,7 +162,16 @@ function adapter(web) {
       listeners.get("message")({ data, source: childWindow, origin: "null" });
     else node.props.onMessage({ nativeEvent: { data } });
   };
-  return { render, deliver, sent, warnings };
+  return {
+    render,
+    deliver,
+    sent,
+    warnings,
+    error: () => root.props.children[1],
+    failSend: () => {
+      failSend = true;
+    },
+  };
 }
 
 for (const web of [false, true]) {
@@ -165,6 +210,7 @@ for (const web of [false, true]) {
     const before = view.sent.length;
     view.render({ ...next, fruits: paid });
     assert.equal(view.sent.length, before);
+    assert.equal(view.error().props.reason, "capacity");
     assert.equal(paid.length, limits.TREE_MAX_FRUITS + 1);
     assert.equal(view.warnings.length, 1);
     assert.deepEqual(view.warnings[0], [
@@ -173,11 +219,46 @@ for (const web of [false, true]) {
     view.deliver(tap);
     assert.deepEqual(taps, ["accepted"]);
     view.render(next);
+    assert.equal(view.error(), null);
     assert.equal(view.sent.at(-1).revision, 2);
     assert.equal(view.sent.at(-1).timeOfDay, 0.8);
     view.deliver(tap);
     assert.deepEqual(taps, ["accepted"]);
     view.deliver({ ...tap, revision: 2 });
     assert.deepEqual(taps, ["accepted", "next"]);
+  });
+
+  test(`${web ? "web" : "native"} collection cache resends full after failed delivery or new session`, () => {
+    const view = adapter(web);
+    const props = {
+      timeOfDay: 0.3,
+      answers: 1,
+      mine: [],
+      notes: [],
+      lanterns: 0,
+      fruits: [{ id: "fixture-a", golden: false }],
+      wateringEvent: null,
+    };
+    view.render(props);
+    view.deliver({ type: "ready", session: "fixture-session" });
+    assert.equal(view.sent.at(-1).fruits.length, 1);
+    view.render({
+      ...props,
+      timeOfDay: 0.4,
+      fruits: props.fruits.map((f) => ({ ...f })),
+    });
+    assert.equal("fruits" in view.sent.at(-1), false);
+    assert.equal("wateringEvent" in view.sent.at(-1), false);
+    const changed = { ...props, fruits: [{ id: "fixture-b", golden: true }] };
+    view.failSend();
+    view.render(changed);
+    assert.equal(view.error().props.reason, "invalid-data");
+    view.render({ ...changed, timeOfDay: 0.8 });
+    assert.equal(view.error(), null);
+    assert.equal(view.sent.at(-1).fruits[0].id, "fixture-b");
+    assert.equal(view.sent.at(-1).revision, 3);
+    view.deliver({ type: "ready", session: "new-session" });
+    assert.equal(view.sent.at(-1).fruits[0].id, "fixture-b");
+    assert.equal(view.sent.at(-1).wateringEvent, null);
   });
 }

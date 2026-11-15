@@ -1,5 +1,5 @@
 import { FRUIT_RUNTIME } from "./fruitRuntime";
-import { TREE_MAX_FRUITS, TREE_MAX_STATE_LENGTH } from "./limits";
+import { TREE_MAX_FRUITS, TREE_MAX_EVENT_FRUITS, TREE_MAX_STATE_LENGTH } from "./limits";
 
 export const TREE_HTML = String.raw`<!doctype html>
 <html lang="en">
@@ -921,7 +921,7 @@ ${FRUIT_RUNTIME}
       !Number.isInteger(value.lanterns) ||
       value.lanterns < 0 ||
       (Array.isArray(value.fruits) && value.fruits.length > ${TREE_MAX_FRUITS}) ||
-      (Array.isArray(value.wateringEvent?.fruitIds) && value.wateringEvent.fruitIds.length > ${TREE_MAX_FRUITS})
+      (Array.isArray(value.wateringEvent?.fruitIds) && value.wateringEvent.fruitIds.length > ${TREE_MAX_EVENT_FRUITS})
     )
       return;
     const nextT = clamp(value.timeOfDay, 0, 1),
