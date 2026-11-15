@@ -5,7 +5,7 @@ import { Pressable, View } from "react-native";
 
 import { Scene, sceneStyles } from "@/components/screens/Scene";
 import { YesterdayIntro } from "@/components/screens/YesterdayIntro";
-import { ScreenState, StoryButton, StoryScreen, StoryText, StoryTimeProvider, useStoryTime } from "@/design";
+import { productSceneStyles, ScreenState, StoryButton, StoryScreen, StoryText, StoryTimeProvider, useStoryTime } from "@/design";
 import { useRitual } from "@/providers/RitualProvider";
 import { useSession } from "@/providers/SessionProvider";
 import { firstOpenView } from "@/services/ritual";
@@ -36,7 +36,10 @@ function FirstOpenGate({ children }: { children: ReactNode }) {
 
 export function TreeNavigation({ hill = false, compact = false }: { hill?: boolean; compact?: boolean }) {
   const { theme } = useStoryTime();
-  const routes = compact ? [['Grove', '/grove']] as const : [['Today', '/today'], ['Bloom', '/bloom'], ['Kindred', '/kindred'], ['Grove', '/grove']] as const;
+  if (compact) return <Pressable accessibilityRole="button" onPress={() => router.replace("/grove")} style={productSceneStyles.secondary}>
+    <StoryText variant="meta" color={hill ? theme.paper : theme.text} style={productSceneStyles.secondaryLabel}>Grove</StoryText>
+  </Pressable>;
+  const routes = [['Today', '/today'], ['Bloom', '/bloom'], ['Kindred', '/kindred'], ['Grove', '/grove']] as const;
   return <View style={sceneStyles.row}>
     {routes.map(([label, route]) =>
       <Pressable key={route} accessibilityRole="button" onPress={() => router.replace(route)} style={{ minHeight: 48, justifyContent: "center", paddingHorizontal: 8 }}><StoryText variant="meta" color={hill ? theme.paper : theme.text}>{label}</StoryText></Pressable>)}

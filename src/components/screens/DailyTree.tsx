@@ -9,7 +9,7 @@ import { DemoPanel } from "@/components/screens/DemoPanel";
 import { LoadingDay, TreeNavigation } from "@/components/screens/Screen";
 import { WateringComposer } from "@/components/screens/WateringComposer";
 import { RemindersSettings } from "@/components/screens/RemindersSettings";
-import { AnswerCard, CharityDetails, GivingFeedback, StoryButton, StoryField, StoryText, TodayCharitySummary, TodayStreaks, useStoryTime } from "@/design";
+import { AnswerCard, CharityDetails, GivingFeedback, productSceneStyles, StoryButton, StoryField, StoryText, TodayCharitySummary, TodayStreaks, useStoryTime } from "@/design";
 import { useRitual, type Today } from "@/providers/RitualProvider";
 import { useSession } from "@/providers/SessionProvider";
 import { api } from "@/services/api";
@@ -73,14 +73,14 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
     setError("");
   }
 
-  const detail = unlocked ? `${today.answerCount} ${today.answerCount === 1 ? "blossom" : "blossoms"} · tap one to read` : `${today.answerCount} of ${today.memberCount} answered · ${today.day.isDemo ? "one-minute demo" : `bloom ${bloomLabel(today.day.bloomAt)} local time`}`;
+  const detail = unlocked ? `${today.answerCount} ${today.answerCount === 1 ? "blossom" : "blossoms"} · tap one to read` : `${today.answerCount} of ${today.memberCount} answered${today.day.isDemo ? "" : ` · bloom ${bloomLabel(today.day.bloomAt)} local time`}`;
   return <Scene timeOfDay={timeOfDay} title={today.day.question}
     treeKey={`${today.tree.treeId}:${today.day.dayId}`}
     meta={`${bloom ? "Bloom" : "StoryTime"} · ${today.tree.name}${today.day.isDemo ? " · sample day" : ""}`} detail={detail}
     onOpenTree={() => { setError(""); setSettings(true); }}
     underQuestion={<View style={sceneStyles.stack}>
       <TodayCharitySummary charity={today.charity} totalRaisedCents={today.totalRaisedCents} isDemo={today.day.isDemo} onShowDetails={() => { setError(""); setCharityOpen(true); }} />
-      <TodayStreaks summary={today.streaks} color={theme.ink} />
+      <TodayStreaks compact summary={today.streaks} color={theme.ink} />
     </View>}
     tree={{ answers: today.answerCount, mine: today.myAnswer ? [today.myAnswer.blossom] : [], notes, lanterns: 0, onTapBlossom: choose,
       fruits: today.fruits.map((fruit) => ({ id: fruit.fruitId, golden: fruit.golden, mine: fruit.isMine })), wateringEvent: watering.treeEvent }}
@@ -104,14 +104,14 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
     </AnswerCard>
     )}>
     <GivingFeedback baselineId={watering.baselineId} event={watering.feedbackEvent} onConsumed={consumeGivingFeedback} color={theme.lantern} />
-    {canAnswer && <StoryButton label="Leave your answer" onPress={() => { setError(""); setComposer(true); }} />}
+    {canAnswer && <StoryButton label="Leave your answer" style={productSceneStyles.primary} onPress={() => { setError(""); setComposer(true); }} />}
     {today.myAnswer && !unlocked && <StoryText color="#f6efe6">Your blossom is on the tree. The answers open when everyone has answered, or at bloom time.</StoryText>}
     {!today.myAnswer && !canAnswer && <StoryText color="#f6efe6">{now < today.day.opensAt ? "The question opens soon." : "This day has closed. Come back for tomorrow’s question."}</StoryText>}
-    {today.myAnswer && <StoryButton label="Water today's tree for S.A.C.K." onPress={() => setWateringOpen(true)} />}
+    {today.myAnswer && <StoryButton label="Water today's tree for S.A.C.K." style={productSceneStyles.primary} onPress={() => setWateringOpen(true)} />}
     <TreeNavigation hill compact />
     {!!error && !composer && !selected && !settings && <StoryText color="#ffd27a" accessibilityRole="alert">{error}</StoryText>}
     {composer && <Panel title="What’s on your mind?" onClose={() => { if (!busy) setComposer(false); }}>
-      <StoryField labelColor="#f6efe6" errorColor="#ffd27a" label="Your answer" value={draft} onChangeText={setDraft} multiline maxLength={2000} editable={!busy} style={{ minHeight: 140 }} />
+      <StoryField autoFocus labelColor="#f6efe6" errorColor="#ffd27a" label="Your answer" value={draft} onChangeText={setDraft} multiline maxLength={2000} editable={!busy} style={{ minHeight: 140 }} />
       <StoryText variant="caption" color="#c6c1c2">One answer for this day. It opens to your circle at bloom, and may become a kindred answer on another tree.</StoryText>
       {!!error && <StoryText color="#ffd27a" accessibilityRole="alert">{error}</StoryText>}
       <StoryButton label="Let it blossom" disabled={!draft.trim()} loading={busy} onPress={() => {
