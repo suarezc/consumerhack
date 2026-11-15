@@ -5,8 +5,12 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { action, internalAction, internalMutation, internalQuery } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { readableDay, requireMember } from "./access";
-import { matchLantern, requireSandbox, sandboxCheckoutUrl, validateAmount, verifyPayment, WHOP_API_VERSION, type VerifiedPayment } from "./lib/payments";
+import { bundleCents, matchLantern, requireSandbox, sandboxCheckoutUrl, validateAmount, verifyPayment, WHOP_API_VERSION, type VerifiedPayment } from "./lib/payments";
 import { ritualWindow } from "./questions";
+import { ensureDay } from "./lifecycle";
+import { ensureSackCause } from "./charity";
+import { ensureMemberUser } from "./identity";
+import { refreshClosedImpact } from "./impact";
 
 const checkoutArgs = {
   deviceId: v.string(),
@@ -49,7 +53,85 @@ function client() {
 const paymentArgs = {
   paymentId: v.string(), checkoutId: v.string(), treeId: v.string(), memberId: v.string(),
   answerId: v.optional(v.string()), amountCents: v.number(), paidAt: v.optional(v.number()),
+  userId: v.optional(v.string()), dayId: v.optional(v.string()), bundles: v.optional(v.number()), recipientAccountId: v.optional(v.string()),
 };
+
+export const wateringArgs = {
+  deviceId: v.string(), treeId: v.id("trees"), dayId: v.optional(v.id("days")),
+  bundles: v.union(v.literal(2), v.literal(5), v.literal(10)), answerId: v.optional(v.id("answers")),
+};
+
+export const prepareWatering = internalMutation({
+  args: wateringArgs,
+  handler: async (ctx, args) => {
+    const amountCents = bundleCents(args.bundles);
+    const member = await requireMember(ctx, args.treeId, args.deviceId);
+    const tree = await ctx.db.get(args.treeId);
+    if (!tree) throw new Error("Tree not found");
+    const targetId = args.dayId ?? tree.demoDayId ?? await ensureDay(ctx, args.treeId);
+    const day = await ctx.db.get(targetId);
+    if (!day || day.treeId !== args.treeId || day.closedAt !== undefined || day.opensAt > Date.now() ||
+        (tree.demoDayId ? day._id !== tree.demoDayId : day.isDemo || day.date !== ritualWindow(Date.now()).date) ||
+        (day.isDemo && !day.ritualDate)) throw new Error("That watering day is not current");
+    const answer = await ctx.db.query("answers").withIndex("by_day_member", q => q.eq("dayId", day._id).eq("memberId", member._id)).unique();
+    if (!answer || (args.answerId && args.answerId !== answer._id)) throw new Error("Answer today's question before watering");
+    const cause = await ctx.db.get(day.causeId ?? await ensureSackCause(ctx));
+    if (!cause?.childAccountId) throw new Error("The example charity's sandbox account is not configured");
+    const userId = await ensureMemberUser(ctx, member);
+    const wateringId = await ctx.db.insert("lanterns", { treeId: args.treeId, memberId: member._id, userId,
+      dayId: day._id, answerId: answer._id, bundles: args.bundles, amountCents, attribution: "checkout_day",
+      creditedDate: day.ritualDate ?? day.date, expectedRecipientAccountId: cause.childAccountId,
+      applicationFeeCents: cause.applicationFeeCents, status: "pending", whopCheckoutId: "", source: "whop",
+      demoRunId: day.isDemo ? day._id : undefined, createdAt: Date.now() });
+    return { wateringId, treeId: args.treeId, memberId: member._id, userId, dayId: day._id, answerId: answer._id,
+      bundles: args.bundles, amountCents, expectedRecipientAccountId: cause.childAccountId, applicationFeeCents: cause.applicationFeeCents };
+  },
+});
+
+export const attachCheckout = internalMutation({
+  args: { wateringId: v.id("lanterns"), checkoutId: v.string() },
+  handler: async (ctx, { wateringId, checkoutId }) => {
+    const row = await ctx.db.get(wateringId);
+    if (!row || row.status !== "pending" || row.attribution !== "checkout_day" || !checkoutId.startsWith("ch_")) throw new Error("Watering intent is not available");
+    if (row.whopCheckoutId === checkoutId) return;
+    if (row.whopCheckoutId) throw new Error("Watering already has a checkout");
+    if (await ctx.db.query("lanterns").withIndex("by_checkout", q => q.eq("whopCheckoutId", checkoutId)).first()) throw new Error("Checkout already exists");
+    await ctx.db.patch(wateringId, { whopCheckoutId: checkoutId });
+  },
+});
+
+export const createWateringCheckout = internalAction({
+  args: wateringArgs,
+  handler: async (ctx, args): Promise<{ wateringId: Id<"lanterns">; checkoutUrl: string }> => {
+    const whop = client();
+    if (!process.env.WHOP_CHILD_WEBHOOK_SECRET) throw new Error("Child-account payment verification is not configured");
+    const intent = await ctx.runMutation(internal.lanterns.prepareWatering, args);
+    let configuration;
+    try {
+      configuration = await whop.checkoutConfigurations.create({ account_id: intent.expectedRecipientAccountId,
+        variant: { title: "S.A.C.K. example watering", billing_type: "one_time", initial_price: intent.amountCents / 100,
+          currency: "usd", ...(intent.applicationFeeCents === undefined ? {} : { application_fee_amount: intent.applicationFeeCents / 100 }) },
+        metadata: { integration: "storytime-watering-sandbox-v2", treeId: intent.treeId, memberId: intent.memberId,
+          userId: intent.userId, dayId: intent.dayId, answerId: intent.answerId, bundles: intent.bundles },
+      });
+    } catch {
+      throw new Error("Sandbox charity checkout is temporarily unavailable");
+    }
+    const checkoutUrl = sandboxCheckoutUrl(configuration.purchase_url);
+    await ctx.runMutation(internal.lanterns.attachCheckout, { wateringId: intent.wateringId, checkoutId: configuration.id });
+    return { wateringId: intent.wateringId, checkoutUrl };
+  },
+});
+
+export const recordCauseAccount = internalMutation({
+  args: { accountId: v.string(), applicationFeeCents: v.optional(v.number()) },
+  handler: async (ctx, { accountId, applicationFeeCents }) => {
+    requireSandbox(process.env.WHOP_ENVIRONMENT);
+    if (!/^biz_[A-Za-z0-9]+$/.test(accountId) || (applicationFeeCents !== undefined && applicationFeeCents !== 1)) throw new Error("Invalid example charity account configuration");
+    const causeId = await ensureSackCause(ctx);
+    await ctx.db.patch(causeId, { childAccountId: accountId, applicationFeeCents });
+  },
+});
 
 async function fillPaidFacts(ctx: MutationCtx, row: Doc<"lanterns">, payment: VerifiedPayment) {
   if (row.source === "demo") throw new Error("Synthetic payment cannot be provider confirmed");
@@ -105,33 +187,12 @@ export const recordPending = internalMutation({
 export const checkout = action({
   args: checkoutArgs,
   handler: async (ctx, args): Promise<{ lanternId: Id<"lanterns">; checkoutUrl: string }> => {
-    const whop = client();
-    if (!process.env.WHOP_WEBHOOK_SECRET) throw new Error("Sandbox payment verification is not configured");
-    const { memberId, demoRunId } = await ctx.runQuery(internal.lanterns.checkoutContext, args);
-    let configuration;
-    try {
-      configuration = await whop.checkoutConfigurations.create({
-        variant: {
-          title: "StoryTime watering",
-          billing_type: "one_time",
-          initial_price: args.amountCents / 100,
-          currency: "usd",
-        },
-        metadata: {
-          integration: "storytime-lantern-sandbox",
-          treeId: args.treeId,
-          memberId,
-          ...(args.answerId ? { answerId: args.answerId } : {}),
-        },
-      });
-    } catch {
-      throw new Error("Sandbox checkout is temporarily unavailable");
-    }
-    const checkoutUrl = sandboxCheckoutUrl(configuration.purchase_url);
-    const lanternId = await ctx.runMutation(internal.lanterns.recordPending, {
-      ...args, memberId, demoRunId, checkoutId: configuration.id,
+    const bundles = args.amountCents / 50;
+    bundleCents(bundles);
+    const result = await ctx.runAction(internal.lanterns.createWateringCheckout, {
+      deviceId: args.deviceId, treeId: args.treeId, answerId: args.answerId, bundles: bundles as 2 | 5 | 10,
     });
-    return { lanternId, checkoutUrl };
+    return { lanternId: result.wateringId, checkoutUrl: result.checkoutUrl };
   },
 });
 

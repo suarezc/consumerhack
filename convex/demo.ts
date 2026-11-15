@@ -6,6 +6,9 @@ import { insertAnswer } from "./answers";
 import { ensureDay } from "./lifecycle";
 import { questionFor, ritualWindow } from "./questions";
 import { DAY_MS, shiftDate } from "./lib/streakLogic";
+import { ensureSackCause, sackCharity } from "./charity";
+import { ensureMemberUser } from "./identity";
+import { refreshClosedImpact } from "./impact";
 
 const samples = [
   { name: "Maya", text: "A friend saved me a seat without being asked." },
@@ -18,10 +21,12 @@ export const restart = mutation({
   handler: async (ctx, { deviceId, treeId }) => {
     await requireHost(ctx, treeId, deviceId);
     const host = await ctx.db.query("members").withIndex("by_tree_device", q => q.eq("treeId", treeId).eq("deviceId", deviceId)).unique();
+    const userId = await ensureMemberUser(ctx, host!);
+    const causeId = await ensureSackCause(ctx);
     const opensAt = Date.now();
     const bloomAt = opensAt + 60_000;
     const ritualDate = ritualWindow(opensAt).date;
-    const dayId = await ctx.db.insert("days", { treeId, date: `demo:${opensAt}`, ritualDate, question: "What small thing made today feel a little softer?", opensAt, bloomAt, isDemo: true });
+    const dayId = await ctx.db.insert("days", { treeId, date: `demo:${opensAt}`, ritualDate, question: "What small thing made today feel a little softer?", opensAt, bloomAt, isDemo: true, charity: sackCharity, causeId });
     await ctx.db.patch(dayId, { demoRunId: dayId });
     await ctx.db.patch(treeId, { demoDayId: dayId });
     for (let offset = -3; offset < 0; offset++) {
@@ -29,12 +34,33 @@ export const restart = mutation({
       const start = Date.parse(`${date}T06:00:00Z`);
       const historyId = await ctx.db.insert("days", { treeId, date: `demo:${dayId}:${date}`, ritualDate: date,
         question: questionFor(date), opensAt: start, bloomAt: start + 15 * 60 * 60 * 1000,
-        bloomedAt: start + 15 * 60 * 60 * 1000, isDemo: true, demoRunId: dayId });
-      await ctx.db.insert("answers", { dayId: historyId, treeId, memberId: host!._id,
+        bloomedAt: start + 15 * 60 * 60 * 1000, closedAt: start + DAY_MS,
+        isDemo: true, demoRunId: dayId, charity: sackCharity, causeId });
+      await ctx.db.insert("answers", { dayId: historyId, treeId, memberId: host!._id, userId,
         text: samples[offset + 3].text, blossom: 0, createdAt: start + DAY_MS / 4 });
-      await ctx.db.insert("lanterns", { treeId, memberId: host!._id, amountCents: 100, status: "paid",
+      await ctx.db.insert("lanterns", { treeId, memberId: host!._id, userId, dayId: historyId, bundles: 2,
+        attribution: "checkout_day", amountCents: 100, status: "paid",
         whopCheckoutId: `demo:${dayId}:${date}`, createdAt: start + DAY_MS / 4,
         paidAt: start + DAY_MS / 4, creditedDate: date, source: "demo", demoRunId: dayId });
+      if (offset === -1) {
+        for (let index = 1; index < 40; index++) {
+          const device = `$demo:${treeId}:history:${index}`;
+          let member = await ctx.db.query("members").withIndex("by_tree_device", q => q.eq("treeId", treeId).eq("deviceId", device)).unique();
+          if (!member) {
+            const id = await ctx.db.insert("members", { treeId, deviceId: device, name: `Demo friend ${index}`,
+              joinedAt: start, isDemo: true, demoHistory: true });
+            member = await ctx.db.get(id);
+          }
+          const otherUser = await ensureMemberUser(ctx, member!);
+          await ctx.db.insert("answers", { dayId: historyId, treeId, memberId: member!._id, userId: otherUser,
+            text: samples[index % samples.length].text, blossom: index, createdAt: start + DAY_MS / 4 });
+          if (index < 12) await ctx.db.insert("lanterns", { treeId, memberId: member!._id, userId: otherUser,
+            dayId: historyId, bundles: 2, attribution: "checkout_day", amountCents: 100, status: "paid",
+            whopCheckoutId: `demo:${dayId}:yesterday:${index}`, createdAt: start + DAY_MS / 4,
+            paidAt: start + DAY_MS / 4, creditedDate: date, source: "demo", demoRunId: dayId });
+        }
+      }
+      await refreshClosedImpact(ctx, historyId);
     }
     for (let index = 0; index < samples.length; index++) {
       const sample = samples[index];
@@ -58,7 +84,7 @@ export const seed = internalMutation({
     if (!day || !day.isDemo || day.bloomedAt !== undefined || Date.now() >= day.bloomAt) return;
     const tree = await ctx.db.get(day.treeId);
     const member = await ctx.db.get(memberId);
-    if (tree?.demoDayId !== dayId || !member?.isDemo || member.treeId !== day.treeId) return;
+    if (tree?.demoDayId !== dayId || !member?.isDemo || member.demoHistory || member.treeId !== day.treeId) return;
     await insertAnswer(ctx, day, memberId, text);
   },
 });

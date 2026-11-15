@@ -2,6 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { deviceIdentity, textValue } from "./access";
 import { ensureDay } from "./lifecycle";
+import { ensureUser } from "./identity";
 
 const cause = v.object({ name: v.string(), goalCents: v.optional(v.number()) });
 
@@ -24,8 +25,9 @@ export const create = mutation({
     }
     if (!code) throw new ConvexError("Please try creating your tree again");
     const now = Date.now();
+    const userId = await ensureUser(ctx, args.deviceId);
     const treeId = await ctx.db.insert("trees", { name, code, hostDeviceId: args.deviceId, cause: treeCause, createdAt: now });
-    const memberId = await ctx.db.insert("members", { treeId, deviceId: args.deviceId, name: memberName, joinedAt: now });
+    const memberId = await ctx.db.insert("members", { treeId, deviceId: args.deviceId, userId, name: memberName, joinedAt: now });
     const dayId = await ensureDay(ctx, treeId);
     return { treeId, memberId, code, dayId };
   },
@@ -41,7 +43,9 @@ export const join = mutation({
     if (!tree) throw new ConvexError("No tree has that invite code");
     const existing = await ctx.db.query("members").withIndex("by_tree_device", q =>
       q.eq("treeId", tree._id).eq("deviceId", args.deviceId)).unique();
-    const memberId = existing?._id ?? await ctx.db.insert("members", { treeId: tree._id, deviceId: args.deviceId, name, joinedAt: Date.now() });
+    const userId = await ensureUser(ctx, args.deviceId);
+    const memberId = existing?._id ?? await ctx.db.insert("members", { treeId: tree._id, deviceId: args.deviceId, userId, name, joinedAt: Date.now() });
+    if (existing && !existing.userId) await ctx.db.patch(existing._id, { userId });
     const dayId = await ensureDay(ctx, tree._id);
     return { treeId: tree._id, memberId, code, dayId: tree.demoDayId ?? dayId };
   },
