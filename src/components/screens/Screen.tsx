@@ -1,41 +1,63 @@
-import { Link, Redirect } from "expo-router";
-import type { ReactNode } from "react";
-import { ActivityIndicator, Button, ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { router, Redirect } from "expo-router";
+import { Component, useState, type ReactNode } from "react";
+import { View } from "react-native";
 
+import { Scene, sceneStyles } from "@/components/screens/Scene";
+import { ScreenState, StoryButton, StoryScreen, StoryText, StoryTimeProvider } from "@/design";
+import { useRitual } from "@/providers/RitualProvider";
 import { useSession } from "@/providers/SessionProvider";
 
 export function Screen({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text accessibilityRole="header" style={styles.title}>{title}</Text>
-        {children}
-      </ScrollView>
-    </SafeAreaView>
-  );
+  return <StoryScreen><StoryText variant="question" accessibilityRole="header">{title}</StoryText>{children}</StoryScreen>;
 }
 
 export function SessionGate({ children, requireTree = false }: { children: ReactNode; requireTree?: boolean }) {
   const { session, loading, error, retry } = useSession();
-  if (loading) return <Screen title="StoryTime"><ActivityIndicator accessibilityLabel="Restoring your tree" /></Screen>;
-  if (error || !session) return <Screen title="Your place is safe"><Text>We couldn’t restore this device’s identity. Try again before continuing.</Text><Button title="Try again" onPress={retry} /></Screen>;
+  const { timeOfDay } = useRitual();
+  if (loading || error || !session) return <Scene timeOfDay={timeOfDay} meta="StoryTime" title="A little room for each other.">
+    <StoryText color="#f6efe6">{loading ? "Finding your place…" : "We couldn’t restore this device’s identity. Your identity won’t be replaced."}</StoryText>
+    {!loading && <StoryButton label="Try again" onPress={retry} />}
+  </Scene>;
   if (requireTree && !session.treeId) return <Redirect href="/" />;
   return children;
 }
 
 export function TreeNavigation() {
-  return <View style={styles.navigation}>
-    <Link href="/today">Today</Link>
-    <Link href="/bloom">Bloom</Link>
-    <Link href="/kindred">Kindred</Link>
-    <Link href="/grove">Grove</Link>
+  return <View style={sceneStyles.row}>
+    {([['Today', '/today'], ['Bloom', '/bloom'], ['Kindred', '/kindred'], ['Grove', '/grove']] as const).map(([label, route]) =>
+      <StoryButton key={route} label={label} tone="quiet" onPress={() => router.replace(route)} />)}
   </View>;
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#f6efe6" },
-  content: { padding: 24, gap: 20, flexGrow: 1 },
-  title: { fontSize: 30 },
-  navigation: { flexDirection: "row", flexWrap: "wrap", gap: 20 },
-});
+export class DataBoundary extends Component<{ children: ReactNode; fallback: (retry: () => void) => ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  render() {
+    return this.state.failed ? this.props.fallback(() => this.setState({ failed: false })) : this.props.children;
+  }
+}
+
+export function DataFailure({ retry }: { retry: () => void }) {
+  const { selectTree } = useSession();
+  const [storageError, setStorageError] = useState(false);
+  return <StoryTimeProvider timeOfDay={0.93}><Scene timeOfDay={0.93} meta="StoryTime" title="The garden is still here.">
+    <StoryText color="#f6efe6">We couldn’t load your tree. Check your connection and try again.</StoryText>
+    <StoryButton label="Try again" onPress={retry} />
+    <StoryButton label="Choose another tree" tone="quiet" onPress={() => {
+      void selectTree(null).then(retry).catch(() => setStorageError(true));
+    }} />
+    {storageError && <StoryText color="#ffd27a" accessibilityRole="alert">This device couldn’t save the change. Your chosen tree has not changed.</StoryText>}
+  </Scene></StoryTimeProvider>;
+}
+
+export function LoadingDay() {
+  const { timeOfDay, today } = useRitual();
+  return <Scene timeOfDay={timeOfDay} meta="StoryTime" title="One question. A little room to grow.">
+    <StoryText color="#f6efe6">{today === undefined ? "Waiting for your tree. If this takes a while, check your connection." : "Today’s question isn’t available yet. You may have joined after the bloom."}</StoryText>
+    <TreeNavigation />
+  </Scene>;
+}
+
+export function Empty({ title, message }: { title: string; message?: string }) {
+  return <ScreenState status="empty" title={title} message={message} />;
+}
