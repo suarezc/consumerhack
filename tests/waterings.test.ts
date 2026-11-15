@@ -1,7 +1,6 @@
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "../convex/_generated/api";
-import type { Id } from "../convex/_generated/dataModel";
 import schema from "../convex/schema";
 import { currentStreak, milestone, ritualClock, shiftDate } from "../convex/lib/streakLogic";
 import { validateAmount, verifyPayment } from "../convex/lib/payments";
@@ -32,7 +31,7 @@ async function fixture() {
 type Test = Awaited<ReturnType<typeof fixture>>["t"];
 type Tree = Awaited<ReturnType<typeof fixture>>["tree"];
 
-async function contribution(t: Test, tree: Tree, date: string, amountCents = 50, answer = true) {
+async function contribution(t: Test, tree: Tree, date: string, amountCents = 100, answer = true) {
   return await t.run(async ctx => {
     const start = Date.parse(`${date}T06:00:00Z`);
     let day = await ctx.db.query("days").withIndex("by_tree_date", q => q.eq("treeId", tree.treeId).eq("date", date)).unique();
@@ -44,7 +43,7 @@ async function contribution(t: Test, tree: Tree, date: string, amountCents = 50,
       text: "Private history", blossom: 0, createdAt: start + 1000 });
     return await ctx.db.insert("lanterns", { treeId: tree.treeId, memberId: tree.memberId, amountCents, status: "paid",
       source: "whop", whopCheckoutId: `ch_${date}_${tree.treeId}_${amountCents}`,
-      createdAt: start, paidAt: start + 1000, creditedDate: date });
+      createdAt: start, paidAt: start + 1000, confirmedAt: start + 1000, creditedDate: date });
   });
 }
 
@@ -74,9 +73,9 @@ describe("computed user dates", () => {
     await contribution(t, other, "2026-11-14", 150);
     await contribution(t, tree, "2026-11-14", 200);
     await contribution(t, other, "2026-11-15", 100);
-    await contribution(t, tree, "2026-11-15", 50);
+    await contribution(t, tree, "2026-11-15", 100);
     const summary = await t.query(api.streaks.summary, { deviceId, treeId: tree.treeId });
-    expect(summary).toMatchObject({ answer: { count: 3, status: "current" }, giving: { count: 3, status: "current", longest: 3, totalCents: 550 }, currency: "USD", isDemo: false });
+    expect(summary).toMatchObject({ answer: { count: 3, status: "current" }, giving: { count: 3, status: "current", longest: 3, totalCents: 650 }, currency: "USD", isDemo: false });
     const today = await t.query(api.days.today, { deviceId, treeId: tree.treeId });
     expect(today?.fruits).toHaveLength(1);
     expect(today?.fruits[0]).toMatchObject({ golden: true, milestone: 3, isMine: true });
@@ -93,7 +92,7 @@ describe("computed user dates", () => {
     await t.run(ctx => ctx.db.patch(tree.memberId, { joinedAt: Date.parse("2026-10-01T06:00:00Z") }));
     for (let offset = -29; offset <= 0; offset++) await contribution(t, tree, shiftDate("2026-11-15", offset));
     const summary = await t.query(api.streaks.summary, { deviceId, treeId: tree.treeId });
-    expect(summary.giving).toMatchObject({ count: 30, longest: 30, totalCents: 1500 });
+    expect(summary.giving).toMatchObject({ count: 30, longest: 30, totalCents: 3000 });
     expect((await t.query(api.days.today, { deviceId, treeId: tree.treeId }))?.fruits[0].milestone).toBe(30);
     const grove = await t.query(api.days.grove, { deviceId, treeId: tree.treeId });
     expect(grove.filter(day => day.fruits[0]?.golden).map(day => day.date).sort()).toEqual([shiftDate("2026-11-15", -27), shiftDate("2026-11-15", -23)].sort());
@@ -101,6 +100,39 @@ describe("computed user dates", () => {
     expect(milestone(dates, "2026-11-15")).toBe(30);
     expect(milestone(dates, "2026-11-16")).toBeNull();
     expect(JSON.stringify(grove)).not.toContain("Private history");
+  });
+
+  it("shows another contributor's cross-tree milestone on the shared tree without private identities or notes", async () => {
+    const { t, tree } = await fixture();
+    const guest = "shared-fruit-guest-00001";
+    const privateTree = await t.mutation(api.trees.create, { deviceId: guest, name: "Private guest tree", memberName: "Guest" });
+    const joined = await t.mutation(api.trees.join, { deviceId: guest, code: tree.code, memberName: "Guest" });
+    await contribution(t, privateTree, "2026-11-13");
+    await contribution(t, privateTree, "2026-11-14");
+    await contribution(t, joined, "2026-11-15");
+    await t.run(async ctx => {
+      const answer = await ctx.db.query("answers").withIndex("by_day_member", q => q.eq("dayId", joined.dayId).eq("memberId", joined.memberId)).unique();
+      await ctx.db.insert("notes", { answerId: answer!._id, fromMemberId: joined.memberId, text: "A private note", createdAt: Date.now() });
+    });
+    const state = await t.query(api.days.today, { deviceId, treeId: tree.treeId });
+    expect(state?.fruits[0]).toMatchObject({ golden: true, milestone: 3, isMine: false });
+    expect(state?.wateringEvent).toBeNull();
+    for (const privateText of [guest, "A private note", "Private history", "memberId", "whopPaymentId"]) {
+      expect(JSON.stringify(state?.fruits)).not.toContain(privateText);
+    }
+    expect((await t.query(api.streaks.summary, { deviceId, treeId: tree.treeId })).giving).toMatchObject({ count: 0, totalCents: 0 });
+  });
+
+  it("breaks the queried streak after a full empty ritual day while preserving longest and lifetime total", async () => {
+    const { t, tree } = await fixture();
+    await contribution(t, tree, "2026-11-13");
+    await contribution(t, tree, "2026-11-14");
+    expect((await t.query(api.streaks.summary, { deviceId, treeId: tree.treeId })).giving).toMatchObject({ count: 2, status: "at_risk" });
+    vi.setSystemTime(new Date("2026-11-16T06:00:00Z"));
+    await t.mutation(internal.lifecycle.morning);
+    const state = await t.query(api.streaks.summary, { deviceId, treeId: tree.treeId });
+    expect(state.answer).toEqual({ count: 0, status: "none" });
+    expect(state.giving).toEqual({ count: 0, status: "none", longest: 2, totalCents: 200 });
   });
 
   it("keeps both summary and Today subscribed to the next real-day insertion", async () => {
@@ -133,8 +165,8 @@ describe("computed user dates", () => {
 
 describe("provider payment facts", () => {
   it("validates new half-dollar steps but preserves legacy non-step verification and uses paid_at, not created_at", () => {
-    for (const cents of [50, 100, 150, 10000]) expect(() => validateAmount(cents)).not.toThrow();
-    for (const cents of [0, -50, 49, 51, 125, 50.5, 10050]) expect(() => validateAmount(cents)).toThrow();
+    for (const cents of [100, 150, 10000]) expect(() => validateAmount(cents)).not.toThrow();
+    for (const cents of [0, -50, 49, 50, 51, 125, 50.5, 10050]) expect(() => validateAmount(cents)).toThrow();
     const money = { amount: "1.25", decimals: 2, currency: "usd" };
     const payment = { id: "pay_legacy", account_id: "biz_test", status: "paid", currency: "usd", subtotal: money, total: money,
       checkout_configuration_id: "ch_test", created_at: "2026-11-14T12:00:00Z", paid_at: "2026-11-16T05:59:59Z",
@@ -196,6 +228,20 @@ describe("provider payment facts", () => {
     await expect(t.mutation(internal.lanterns.backfillPaymentFacts, event)).rejects.toThrow("Duplicate");
     expect(await t.run(ctx => ctx.db.query("lanterns").collect())).toHaveLength(2);
   });
+
+  it("does not fabricate a fresh reaction when backfill adds a historical current-day fruit", async () => {
+    const { t, tree } = await fixture();
+    const rowId = await t.run(ctx => ctx.db.insert("lanterns", { treeId: tree.treeId, memberId: tree.memberId,
+      amountCents: 125, whopCheckoutId: "ch_backfill_only", whopPaymentId: "pay_backfill_only", status: "paid", createdAt: Date.now() - 5000 }));
+    const payment = { rowId, treeId: tree.treeId, memberId: tree.memberId, amountCents: 125,
+      checkoutId: "ch_backfill_only", paymentId: "pay_backfill_only", paidAt: Date.now() - 1000 };
+    await t.mutation(internal.lanterns.backfillPaymentFacts, payment);
+    const state = await t.query(api.days.today, { deviceId, treeId: tree.treeId });
+    expect(state?.fruits).toHaveLength(1);
+    expect(state?.wateringEvent).toBeNull();
+    expect(state?.streaks.giving).toMatchObject({ count: 1, totalCents: 125 });
+    expect((await t.run(ctx => ctx.db.get(rowId)))?.confirmedAt).toBeUndefined();
+  });
 });
 
 describe("isolated demo history and paid reaction", () => {
@@ -203,19 +249,19 @@ describe("isolated demo history and paid reaction", () => {
     const { t, tree } = await fixture();
     await contribution(t, tree, "2026-11-14", 100);
     const run = await t.mutation(api.demo.restart, { deviceId, treeId: tree.treeId });
-    expect(await t.query(api.streaks.summary, { deviceId, treeId: tree.treeId })).toMatchObject({ answer: { count: 3, status: "at_risk" }, giving: { count: 3, status: "at_risk", totalCents: 150 }, isDemo: true });
+    expect(await t.query(api.streaks.summary, { deviceId, treeId: tree.treeId })).toMatchObject({ answer: { count: 3, status: "at_risk" }, giving: { count: 3, status: "at_risk", totalCents: 300 }, isDemo: true });
     const grove = await t.query(api.days.grove, { deviceId, treeId: tree.treeId });
     expect(grove).toHaveLength(3);
     expect(grove[0].fruits[0]).toMatchObject({ golden: true, source: "demo", milestone: 3, isMine: true });
-    await expect(t.mutation(api.waterings.demoWater, { deviceId, treeId: tree.treeId, runId: run.dayId, amountCents: 50 })).rejects.toThrow("not available");
+    await expect(t.mutation(api.waterings.demoWater, { deviceId, treeId: tree.treeId, runId: run.dayId, amountCents: 100 })).rejects.toThrow("not available");
     await t.mutation(api.answers.submit, { deviceId, dayId: run.dayId, text: "Today's demo answer" });
     await vi.advanceTimersByTimeAsync(30_001);
     await t.finishInProgressScheduledFunctions();
-    const args = { deviceId, treeId: tree.treeId, runId: run.dayId, amountCents: 50 };
+    const args = { deviceId, treeId: tree.treeId, runId: run.dayId, amountCents: 100 };
     const results = await Promise.all(Array.from({ length: 5 }, () => t.mutation(api.waterings.demoWater, args)));
     expect(new Set(results.map(row => row.wateringId)).size).toBe(1);
     const today = await t.query(api.days.today, { deviceId, treeId: tree.treeId });
-    expect(today?.streaks).toMatchObject({ answer: { count: 4, status: "current" }, giving: { count: 4, status: "current", totalCents: 200 } });
+    expect(today?.streaks).toMatchObject({ answer: { count: 4, status: "current" }, giving: { count: 4, status: "current", totalCents: 400 } });
     expect(today?.fruits[0]).toMatchObject({ golden: false, source: "demo" });
     expect(today?.wateringEvent?.id).toBe(results[0].wateringId);
     expect(today?.raisedCents).toBe(100);
@@ -244,7 +290,7 @@ describe("isolated demo history and paid reaction", () => {
     expect(today?.raisedCents).toBe(150);
     expect(today?.wateringEvent).toBeNull();
     expect(today?.fruits).toEqual([]);
-    expect(today?.streaks.giving).toMatchObject({ count: 3, totalCents: 150 });
+    expect(today?.streaks.giving).toMatchObject({ count: 3, totalCents: 300 });
     await t.mutation(api.demo.stop, { deviceId, treeId: tree.treeId });
     const real = await t.query(api.days.today, { deviceId, treeId: tree.treeId });
     expect(real?.streaks.giving).toMatchObject({ count: 1, totalCents: 150 });

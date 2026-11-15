@@ -7,8 +7,8 @@ export function requireSandbox(environment: string | undefined) {
 }
 
 export function validateAmount(amountCents: number) {
-  if (!Number.isSafeInteger(amountCents) || amountCents <= 0 || amountCents % 50 !== 0 || amountCents > 10_000) {
-    throw new Error("Choose an amount from $0.50 to $100 in $0.50 increments");
+  if (!Number.isSafeInteger(amountCents) || amountCents < 100 || amountCents % 50 !== 0 || amountCents > 10_000) {
+    throw new Error("Choose an amount from $1 to $100 in $0.50 increments");
   }
 }
 

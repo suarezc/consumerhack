@@ -98,6 +98,7 @@ export default defineSchema({
     whopPaymentId: v.optional(v.string()),
     createdAt: v.number(),
     paidAt: v.optional(v.number()),
+    confirmedAt: v.optional(v.number()),
     creditedDate: v.optional(v.string()),
     source: v.optional(v.union(v.literal("whop"), v.literal("demo"))),
     demoRunId: v.optional(v.id("days")),

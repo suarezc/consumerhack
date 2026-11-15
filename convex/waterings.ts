@@ -26,7 +26,7 @@ export const demoWater = mutation({
     const existing = await ctx.db.query("lanterns").withIndex("by_checkout", q => q.eq("whopCheckoutId", key)).first();
     if (existing) return { wateringId: existing._id, isDemo: true as const };
     const wateringId = await ctx.db.insert("lanterns", { treeId, memberId: member._id, amountCents,
-      status: "paid", whopCheckoutId: key, createdAt: Date.now(), paidAt: Date.now(),
+      status: "paid", whopCheckoutId: key, createdAt: Date.now(), paidAt: Date.now(), confirmedAt: Date.now(),
       creditedDate: day.ritualDate, source: "demo", demoRunId: runId });
     return { wateringId, isDemo: true as const };
   },

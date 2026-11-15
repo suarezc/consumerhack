@@ -49,7 +49,7 @@ export async function userSummary(ctx: ReadCtx, deviceId: string, run: Doc<"days
   };
 }
 
-export async function dayFruit(ctx: ReadCtx, treeId: Id<"trees">, date: string, viewer: Id<"members">, run: Doc<"days"> | null, ownOnly = false) {
+export async function dayGiving(ctx: ReadCtx, treeId: Id<"trees">, date: string, viewer: Id<"members">, run: Doc<"days"> | null, ownOnly = false) {
   const rows = (await ctx.db.query("lanterns").withIndex("by_tree", q => q.eq("treeId", treeId)).collect())
     .filter(row => row.status === "paid" && row.paidAt !== undefined && row.creditedDate === date &&
       (run ? row.demoRunId === run._id : row.source !== "demo") && (!ownOnly || row.memberId === viewer));
@@ -67,7 +67,9 @@ export async function dayFruit(ctx: ReadCtx, treeId: Id<"trees">, date: string, 
     fruits.push({ fruitId: row._id, date, golden: reached !== null, isMine: row.memberId === viewer,
       milestone: reached, source: row.source ?? "whop" as const, paidAt: row.paidAt! });
   }
-  return fruits;
+  const latest = rows.filter(row => row.memberId === viewer && row.confirmedAt !== undefined)
+    .sort((a, b) => a.confirmedAt! - b.confirmedAt! || a._id.localeCompare(b._id)).at(-1);
+  return { fruits, wateringEvent: latest ? { id: latest._id, fruitId: latest._id, revision: 1 } : null };
 }
 
 export const summary = query({

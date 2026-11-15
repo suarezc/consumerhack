@@ -4,6 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, type MutationCtx } from "./_generated/server";
 import { activeDay } from "./access";
 import { questionFor, ritualWindow } from "./questions";
+import { queueBloomNotifications } from "./notifications";
 
 export async function ensureDay(ctx: MutationCtx, treeId: Id<"trees">) {
   const window = ritualWindow(Date.now());
@@ -24,6 +25,7 @@ export async function maybeBloom(ctx: MutationCtx, day: Doc<"days">) {
   if (Date.now() < day.bloomAt && !everyone) return;
   const now = Date.now();
   await ctx.db.patch(day._id, { bloomedAt: now, judgeQueuedAt: now });
+  await queueBloomNotifications(ctx, { ...day, bloomedAt: now, judgeQueuedAt: now });
   await ctx.scheduler.runAfter(0, internal.judgeHook.run, { dayId: day._id });
 }
 
