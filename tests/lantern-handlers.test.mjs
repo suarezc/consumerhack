@@ -53,7 +53,7 @@ function database() {
 
 test("tree checkout requires membership, a cause, and a bounded amount", async () => {
   const { ctx, tables } = database();
-  assert.deepEqual(await checkoutContext._handler(ctx, args), { memberId: "member" });
+  assert.deepEqual(await checkoutContext._handler(ctx, args), { memberId: "member", demoRunId: "day" });
   await assert.rejects(() => checkoutContext._handler(ctx, { ...args, deviceId: "unknown-device-bearer-12345678901234567890" }));
   await assert.rejects(() => checkoutContext._handler(ctx, { ...args, amountCents: 0 }));
   tables.trees[0].cause = undefined;
@@ -62,7 +62,7 @@ test("tree checkout requires membership, a cause, and a bounded amount", async (
 
 test("answer checkout enforces the tree, participation, bloom and active demo", async () => {
   const input = { ...args, answerId: "answer" };
-  assert.deepEqual(await checkoutContext._handler(database().ctx, input), { memberId: "member" });
+  assert.deepEqual(await checkoutContext._handler(database().ctx, input), { memberId: "member", demoRunId: "day" });
   for (const alter of [
     tables => { tables.answers[0].treeId = "other"; },
     tables => { tables.answers[0].memberId = "other"; },

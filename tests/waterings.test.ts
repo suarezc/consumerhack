@@ -242,6 +242,23 @@ describe("provider payment facts", () => {
     expect(state?.streaks.giving).toMatchObject({ count: 1, totalCents: 125 });
     expect((await t.run(ctx => ctx.db.get(rowId)))?.confirmedAt).toBeUndefined();
   });
+
+  it("keeps an initially undated new payment non-reactive when facts arrive later by replay or backfill", async () => {
+    const { t, tree } = await fixture();
+    const input = { deviceId, treeId: tree.treeId, memberId: tree.memberId, amountCents: 100, checkoutId: "ch_initially_undated" };
+    const rowId = await t.mutation(internal.lanterns.recordPending, input);
+    const event = { treeId: tree.treeId, memberId: tree.memberId, amountCents: 100, checkoutId: input.checkoutId, paymentId: "pay_initially_undated" };
+    await t.mutation(internal.lanterns.applyPayment, event);
+    expect((await t.query(api.days.today, { deviceId, treeId: tree.treeId }))?.wateringEvent).toBeNull();
+    expect((await t.run(ctx => ctx.db.get(rowId)))?.confirmedAt).toBeUndefined();
+    await t.mutation(internal.lanterns.backfillPaymentFacts, { ...event, rowId, paidAt: Date.now() - 1000 });
+    await t.mutation(internal.lanterns.applyPayment, { ...event, paidAt: Date.now() - 1000 });
+    const state = await t.query(api.days.today, { deviceId, treeId: tree.treeId });
+    expect(state?.fruits).toHaveLength(1);
+    expect(state?.wateringEvent).toBeNull();
+    expect(state?.streaks.giving).toMatchObject({ count: 1, totalCents: 100 });
+    expect((await t.run(ctx => ctx.db.get(rowId)))?.confirmedAt).toBeUndefined();
+  });
 });
 
 describe("isolated demo history and paid reaction", () => {
@@ -280,7 +297,7 @@ describe("isolated demo history and paid reaction", () => {
   it("keeps late genuine demo checkout callbacks in real totals but out of a newer run's fruit/reaction", async () => {
     const { t, tree } = await fixture();
     const run = await t.mutation(api.demo.restart, { deviceId, treeId: tree.treeId });
-    await t.mutation(internal.lanterns.recordPending, { deviceId, treeId: tree.treeId, memberId: tree.memberId, amountCents: 150, checkoutId: "ch_demo_real" });
+    await t.mutation(internal.lanterns.recordPending, { deviceId, treeId: tree.treeId, memberId: tree.memberId, amountCents: 150, checkoutId: "ch_demo_real", demoRunId: run.dayId });
     await t.mutation(api.demo.restart, { deviceId, treeId: tree.treeId });
     const paidAt = Date.now();
     const event = { treeId: tree.treeId, memberId: tree.memberId, amountCents: 150, checkoutId: "ch_demo_real", paymentId: "pay_real_demo", paidAt };
@@ -298,5 +315,30 @@ describe("isolated demo history and paid reaction", () => {
     const paid = await t.run(ctx => ctx.db.query("lanterns").withIndex("by_payment", q => q.eq("whopPaymentId", "pay_real_demo")).collect());
     expect(paid).toHaveLength(1);
     expect(paid[0].demoRunId).toBe(run.dayId);
+  });
+
+  it("captures demo identity before external checkout and never retags an in-flight operation after restart", async () => {
+    const { t, tree } = await fixture();
+    const args = { deviceId, treeId: tree.treeId, amountCents: 150 };
+    const normalOrigin = await t.query(internal.lanterns.checkoutContext, args);
+    expect(normalOrigin.demoRunId).toBeNull();
+    const first = await t.mutation(api.demo.restart, { deviceId, treeId: tree.treeId });
+    const origin = await t.query(internal.lanterns.checkoutContext, args);
+    expect(origin.demoRunId).toBe(first.dayId);
+    const second = await t.mutation(api.demo.restart, { deviceId, treeId: tree.treeId });
+    const normal = await t.mutation(internal.lanterns.recordPending, { ...args, ...normalOrigin, checkoutId: "ch_normal_inflight" });
+    const rowId = await t.mutation(internal.lanterns.recordPending, { ...args, ...origin, checkoutId: "ch_inflight" });
+    expect((await t.run(ctx => ctx.db.get(rowId)))?.demoRunId).toBe(first.dayId);
+    expect((await t.run(ctx => ctx.db.get(normal)))?.demoRunId).toBeUndefined();
+    for (const [checkoutId, paymentId] of [["ch_normal_inflight", "pay_normal_inflight"], ["ch_inflight", "pay_inflight"]]) {
+      await t.mutation(internal.lanterns.applyPayment, { treeId: tree.treeId, memberId: tree.memberId,
+        checkoutId, paymentId, amountCents: 150, paidAt: Date.now() });
+    }
+    const state = await t.query(api.days.today, { deviceId, treeId: tree.treeId });
+    expect(state?.day.dayId).toBe(second.dayId);
+    expect(state?.fruits).toEqual([]);
+    expect(state?.wateringEvent).toBeNull();
+    expect(state?.streaks.giving).toMatchObject({ count: 3, status: "at_risk", totalCents: 300 });
+    expect(state?.raisedCents).toBe(300);
   });
 });

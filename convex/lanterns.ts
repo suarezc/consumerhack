@@ -69,14 +69,22 @@ async function fillPaidFacts(ctx: MutationCtx, row: Doc<"lanterns">, payment: Ve
 
 export const checkoutContext = internalQuery({
   args: checkoutArgs,
-  handler: async (ctx, args) => ({ memberId: (await authorizeCheckout(ctx, args))._id }),
+  handler: async (ctx, args) => {
+    const member = await authorizeCheckout(ctx, args);
+    const tree = await ctx.db.get(args.treeId);
+    return { memberId: member._id, demoRunId: tree?.demoDayId ?? null };
+  },
 });
 
 export const recordPending = internalMutation({
-  args: { ...checkoutArgs, checkoutId: v.string(), memberId: v.id("members") },
+  args: { ...checkoutArgs, checkoutId: v.string(), memberId: v.id("members"), demoRunId: v.optional(v.union(v.id("days"), v.null())) },
   handler: async (ctx, args) => {
     const member = await authorizeCheckout(ctx, args);
     if (member._id !== args.memberId) throw new Error("Membership changed during checkout");
+    if (args.demoRunId) {
+      const origin = await ctx.db.get(args.demoRunId);
+      if (!origin?.isDemo || origin.treeId !== args.treeId) throw new Error("Invalid checkout demo context");
+    }
     const existing = await ctx.db.query("lanterns").withIndex("by_checkout", q =>
       q.eq("whopCheckoutId", args.checkoutId)).first();
     if (existing) throw new Error("Checkout has already been recorded");
@@ -89,7 +97,7 @@ export const recordPending = internalMutation({
       whopCheckoutId: args.checkoutId,
       createdAt: Date.now(),
       source: "whop",
-      demoRunId: (await ctx.db.get(args.treeId))?.demoDayId,
+      demoRunId: args.demoRunId ?? undefined,
     });
   },
 });
@@ -99,7 +107,7 @@ export const checkout = action({
   handler: async (ctx, args): Promise<{ lanternId: Id<"lanterns">; checkoutUrl: string }> => {
     const whop = client();
     if (!process.env.WHOP_WEBHOOK_SECRET) throw new Error("Sandbox payment verification is not configured");
-    const { memberId } = await ctx.runQuery(internal.lanterns.checkoutContext, args);
+    const { memberId, demoRunId } = await ctx.runQuery(internal.lanterns.checkoutContext, args);
     let configuration;
     try {
       configuration = await whop.checkoutConfigurations.create({
@@ -121,7 +129,7 @@ export const checkout = action({
     }
     const checkoutUrl = sandboxCheckoutUrl(configuration.purchase_url);
     const lanternId = await ctx.runMutation(internal.lanterns.recordPending, {
-      ...args, memberId, checkoutId: configuration.id,
+      ...args, memberId, demoRunId, checkoutId: configuration.id,
     });
     return { lanternId, checkoutUrl };
   },
@@ -149,9 +157,11 @@ export const applyPayment = internalMutation({
       await fillPaidFacts(ctx, previous, payment);
       return null;
     }
-    const facts = payment.paidAt === undefined ? {} : { paidAt: payment.paidAt, creditedDate: ritualWindow(payment.paidAt).date };
+    const facts = payment.paidAt === undefined ? {} : {
+      paidAt: payment.paidAt, creditedDate: ritualWindow(payment.paidAt).date, confirmedAt: Date.now(),
+    };
     if (lantern.status === "pending") {
-      await ctx.db.patch(lantern._id, { status: "paid", whopPaymentId: payment.paymentId, source: "whop", confirmedAt: Date.now(), ...facts });
+      await ctx.db.patch(lantern._id, { status: "paid", whopPaymentId: payment.paymentId, source: "whop", ...facts });
     } else {
       await ctx.db.insert("lanterns", {
         treeId: lantern.treeId,
@@ -162,7 +172,6 @@ export const applyPayment = internalMutation({
         whopCheckoutId: payment.checkoutId,
         whopPaymentId: payment.paymentId,
         createdAt: Date.now(),
-        confirmedAt: Date.now(),
         source: "whop",
         demoRunId: lantern.demoRunId,
         ...facts,
