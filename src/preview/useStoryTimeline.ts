@@ -70,8 +70,7 @@ export function useStoryTimeline() {
       ]);
     },
     addBundles(bundles: 2 | 5 | 10) {
-      if (!snapshot.fruits.length || snapshot.lightBundles + bundles > 1000)
-        return;
+      if (!snapshot.fruits.length) return;
       setPlaying(false);
       const id = `sample-run-${run.current}-bundle-${++sequence.current}`;
       setActions((v) => [

@@ -15,7 +15,7 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
 #sky { display: block; width: 100%; height: 100%; touch-action: none; -webkit-user-select: none; user-select: none; }
 </style>
 </head>
-<body><main id="scene"><canvas id="sky" role="img" aria-label="A shared tree. Each blossom is an answer. Golden blossoms are yours."></canvas></main>
+<body><main id="scene"><canvas id="sky" role="img" aria-label="A shared tree of responses, with fruits and giving lights."></canvas></main>
 <script>
 (function () {
   "use strict";
@@ -505,7 +505,7 @@ ${WEATHER_RUNTIME}
     const g = growth(t),
       b = bloom,
       nf = nightAt(t),
-      n = answersAt(t);
+      n = lightBundles === null ? answersAt(t) : 0;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     const sky = ctx.createLinearGradient(0, 0, 0, groundY + 40);
@@ -988,7 +988,7 @@ ${WEATHER_RUNTIME}
       lightBundles = value.lightBundles;
       bundleLightLayer.update(lightBundles, value.goldenLightBundles, value.lightEvent, animationTime(), still);
     }
-    if (!still)
+    if (!still && lightBundles === null)
       arrivals.slice(-12).forEach(function (i) {
         if (pending[i]) return;
         pending[i] = true;

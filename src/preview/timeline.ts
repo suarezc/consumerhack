@@ -9,7 +9,9 @@ export function timelineSnapshot(
   progress: number,
   actions: readonly SampleAction[],
 ) {
-  const timeOfDay = Math.min(1, Math.max(0, progress));
+  const timeOfDay = Number.isFinite(progress)
+    ? Math.min(1, Math.max(0, progress))
+    : 0;
   const responses = RESPONSE_TIMES.filter((at) => at <= timeOfDay).map(
     (_, i) => ({ id: `sample-response-${i + 1}`, golden: false, mine: false }),
   );

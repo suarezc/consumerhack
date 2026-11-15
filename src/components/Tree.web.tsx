@@ -44,7 +44,7 @@ export function Tree(props: TreeProps) {
   const revision = useRef(0);
   const allowTaps = useRef(false);
   const [unavailable, setUnavailable] = useState<
-    "capacity" | "invalid-data" | null
+    "capacity" | "light-capacity" | "invalid-data" | null
   >(null);
   const serializer = useRef(createTreeStateSerializer());
 
@@ -69,7 +69,11 @@ export function Tree(props: TreeProps) {
       allowTaps.current = false;
       const status = getTreeDataStatus(latest.current);
       setUnavailable(
-        status.status === "unavailable" ? status.reason : "invalid-data",
+        status.status === "unavailable"
+          ? status.reason === "capacity" && status.detail === "lights"
+            ? "light-capacity"
+            : status.reason
+          : "invalid-data",
       );
       console.warn(
         "Tree snapshot exceeds supported transport limits; no fruits were truncated.",

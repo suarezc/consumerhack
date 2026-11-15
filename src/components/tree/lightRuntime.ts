@@ -50,7 +50,7 @@ function createBundleLightLayer() {
         const glow = Math.max(9, scene.unit * 0.1);
         ctx.drawImage(scene.glow, fx - glow, fy - glow, glow * 2, glow * 2);
         ctx.globalAlpha = 0.85;
-        ctx.fillStyle = "#fff4c8";
+        ctx.fillStyle = i < golden ? "#ffce69" : "#fff4c8";
         ctx.beginPath();
         ctx.arc(fx, fy, 1.7, 0, Math.PI * 2);
         ctx.fill();

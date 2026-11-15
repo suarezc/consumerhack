@@ -90,6 +90,30 @@ test("response samples create one fruit and bundles never create a response frui
   assert.ok(paid.fruits.every((f) => f.golden === false));
   assert.equal(timelineSnapshot(0, actions).lightBundles, 0);
 });
+
+test("verified light totals are never silently clipped at the visual budget", () => {
+  const props = {
+    timeOfDay: 1,
+    answers: 0,
+    mine: [],
+    notes: [],
+    lanterns: 0,
+    fruits: [],
+    lightBundles: 1001,
+    goldenLightBundles: 1001,
+  };
+  const normalized = bridge.normalizeTreeState(props);
+  assert.equal(normalized.lightBundles, 1001);
+  assert.equal(normalized.goldenLightBundles, 1001);
+  const status = bridge.getTreeDataStatus(props);
+  assert.equal(status.status, "unavailable");
+  assert.equal(status.reason, "capacity");
+  assert.equal(status.detail, "lights");
+  assert.equal(
+    bridge.serializeTreeState(props, "session", 1, true, false),
+    null,
+  );
+});
 test("each sample bundle adds exactly one fairy light and one firefly, one flourish by ID", () => {
   for (const bundles of [2, 5, 10]) {
     const layer = createBundleLightLayer();
@@ -146,6 +170,22 @@ test("weather is independent and bounded, with quiet static reduced-motion treat
   const serialize = bridge.createTreeStateSerializer();
   const initial = JSON.parse(serialize(inputs, "session", 1, true, false));
   assert.equal(initial.fruits[0].golden, false);
+  const transition = bridge.createTreeStateSerializer();
+  transition(
+    {
+      ...inputs,
+      lightBundles: undefined,
+      goldenLightBundles: undefined,
+      lightEvent: undefined,
+    },
+    "transition",
+    1,
+    true,
+    false,
+  );
+  const revised = JSON.parse(transition(inputs, "transition", 2, true, false));
+  assert.equal(revised.fruits[0].golden, false);
+  assert.equal(revised.fruits[0].responseIndex, 0);
   for (const [i, weather] of ["rain", "snow", "clear"].entries()) {
     const tick = JSON.parse(
       serialize({ ...inputs, weather }, "session", i + 2, true, false),

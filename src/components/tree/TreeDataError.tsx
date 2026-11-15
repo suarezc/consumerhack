@@ -3,14 +3,16 @@ import { StyleSheet, Text, View } from "react-native";
 export function TreeDataError({
   reason,
 }: {
-  reason: "capacity" | "invalid-data";
+  reason: "capacity" | "light-capacity" | "invalid-data";
 }) {
   const title =
-    reason === "capacity"
-      ? "Fruit detail unavailable for this large tree"
-      : "Fruit detail unavailable";
+    reason === "light-capacity"
+      ? "Giving light detail unavailable for this large tree"
+      : reason === "capacity"
+        ? "Fruit detail unavailable for this large tree"
+        : "Fruit detail unavailable";
   const detail =
-    reason === "capacity"
+    reason !== "invalid-data"
       ? "Your giving records are unchanged."
       : "This tree’s detail couldn’t be loaded. Your giving records are unchanged.";
   return (

@@ -1,6 +1,7 @@
 import type { TreeProps } from "./types";
 import {
   TREE_MAX_FRUITS,
+  TREE_MAX_LIGHT_BUNDLES,
   TREE_MAX_EVENT_FRUITS,
   TREE_MAX_ID_LENGTH,
   TREE_MAX_SESSION_LENGTH,
@@ -23,10 +24,18 @@ export type TreeDataStatus =
       status: "unavailable";
       reason: "capacity" | "invalid-data";
       fruitCount: number | null;
+      detail?: "lights";
     };
 
 export function getTreeDataStatus(
-  props: Pick<TreeProps, "fruits" | "wateringEvent">,
+  props: Pick<
+    TreeProps,
+    | "fruits"
+    | "wateringEvent"
+    | "lightBundles"
+    | "goldenLightBundles"
+    | "lightEvent"
+  >,
 ): TreeDataStatus {
   const fruits = props.fruits;
   const fruitCount =
@@ -34,6 +43,26 @@ export function getTreeDataStatus(
   if (fruitCount === null)
     return { status: "unavailable", reason: "invalid-data", fruitCount };
   const event = props.wateringEvent;
+  const total = props.lightBundles ?? 0;
+  const golden = props.goldenLightBundles ?? 0;
+  if (
+    !Number.isSafeInteger(total) ||
+    total < 0 ||
+    !Number.isSafeInteger(golden) ||
+    golden < 0 ||
+    golden > total
+  )
+    return { status: "unavailable", reason: "invalid-data", fruitCount };
+  if (
+    total > TREE_MAX_LIGHT_BUNDLES ||
+    (props.lightEvent?.lightBundles ?? 0) > TREE_MAX_LIGHT_BUNDLES
+  )
+    return {
+      status: "unavailable",
+      reason: "capacity",
+      fruitCount,
+      detail: "lights",
+    };
   if (
     fruitCount > TREE_MAX_FRUITS ||
     (Array.isArray(event?.fruitIds) &&
@@ -67,7 +96,10 @@ export function getTreeDataStatus(
 
 export function normalizeTreeState(props: TreeProps) {
   const answers = normalizeAnswerCount(props.answers);
-  const lightBundles = count(props.lightBundles ?? 0, 1000);
+  const lightBundles =
+    Number.isSafeInteger(props.lightBundles) && props.lightBundles! >= 0
+      ? props.lightBundles!
+      : 0;
   const responseMode =
     props.lightBundles !== undefined || props.lightEvent !== undefined;
   const responseIndices = new Map<string, number>();
@@ -87,7 +119,7 @@ export function normalizeTreeState(props: TreeProps) {
     event.revision > 0 &&
     Number.isInteger(event.lightBundles) &&
     event.lightBundles > 0 &&
-    event.lightBundles <= 1000
+    Number.isSafeInteger(event.lightBundles)
       ? {
           id: event.id,
           revision: event.revision,
@@ -126,13 +158,14 @@ export function normalizeTreeState(props: TreeProps) {
       props.weather === "rain" || props.weather === "snow"
         ? props.weather
         : "clear",
-    ...(props.lightBundles !== undefined
+    ...(responseMode
       ? {
           lightBundles,
-          goldenLightBundles: count(
-            props.goldenLightBundles ?? 0,
-            lightBundles,
-          ),
+          goldenLightBundles:
+            Number.isSafeInteger(props.goldenLightBundles) &&
+            props.goldenLightBundles! >= 0
+              ? props.goldenLightBundles!
+              : 0,
         }
       : {}),
     ...(props.lightEvent !== undefined ? { lightEvent } : {}),
@@ -223,6 +256,7 @@ export function createTreeStateSerializer() {
   let session: string | null = null;
   let fruits: NonNullable<TreeProps["fruits"]> = [];
   let event: TreeProps["wateringEvent"] = null;
+  let responseMode: boolean | null = null;
   const serialize = (
     props: TreeProps,
     nextSession: string,
@@ -233,8 +267,11 @@ export function createTreeStateSerializer() {
     if (getTreeDataStatus(props).status !== "ready") return null;
     const nextFruits = props.fruits ?? [];
     const nextEvent = props.wateringEvent ?? null;
+    const nextResponseMode =
+      props.lightBundles !== undefined || props.lightEvent !== undefined;
     const includeFruits =
       session !== nextSession ||
+      responseMode !== nextResponseMode ||
       nextFruits.length !== fruits.length ||
       nextFruits.some(
         (fruit, i) =>
@@ -261,6 +298,7 @@ export function createTreeStateSerializer() {
     );
     if (data === null) return null;
     session = nextSession;
+    responseMode = nextResponseMode;
     if (includeFruits)
       fruits = nextFruits.map(({ id, golden, mine }) => ({ id, golden, mine }));
     if (includeEvent)
@@ -279,6 +317,7 @@ export function createTreeStateSerializer() {
   return Object.assign(serialize, {
     reset() {
       session = null;
+      responseMode = null;
       fruits = [];
       event = null;
     },
