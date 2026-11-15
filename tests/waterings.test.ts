@@ -43,6 +43,7 @@ async function contribution(t: Test, tree: Tree, date: string, amountCents = 100
       text: "Private history", blossom: 0, createdAt: start + 1000 });
     return await ctx.db.insert("lanterns", { treeId: tree.treeId, memberId: tree.memberId, amountCents, status: "paid",
       source: "whop", whopCheckoutId: `ch_${date}_${tree.treeId}_${amountCents}`,
+      whopPaymentId: `pay_${date}_${tree.treeId}_${amountCents}`,
       createdAt: start, paidAt: start + 1000, confirmedAt: start + 1000, creditedDate: date });
   });
 }
@@ -77,7 +78,7 @@ describe("computed user dates", () => {
     const summary = await t.query(api.streaks.summary, { deviceId, treeId: tree.treeId });
     expect(summary).toMatchObject({ answer: { count: 3, status: "current" }, giving: { count: 3, status: "current", longest: 3, totalCents: 650 }, currency: "USD", isDemo: false });
     const today = await t.query(api.days.today, { deviceId, treeId: tree.treeId });
-    expect(today?.fruits).toHaveLength(1);
+    expect(today?.fruits).toHaveLength(2);
     expect(today?.fruits[0]).toMatchObject({ golden: true, milestone: 3, isMine: true });
     expect(today?.wateringEvent?.fruitId).toBe(today?.fruits[0].fruitId);
     const serialized = JSON.stringify(today);
@@ -198,6 +199,8 @@ describe("provider payment facts", () => {
 
   it("preserves undated historical money and fills only missing facts on verified replay or bounded backfill", async () => {
     const { t, tree } = await fixture();
+    await t.run(ctx => ctx.db.insert("days", { treeId: tree.treeId, date: "2026-11-14", question: "A prior question",
+      opensAt: Date.parse("2026-11-14T06:00:00Z"), bloomAt: Date.parse("2026-11-14T21:00:00Z") }));
     const input = { deviceId, treeId: tree.treeId, memberId: tree.memberId, amountCents: 100, checkoutId: "ch_legacy" };
     const rowId = await t.mutation(internal.lanterns.recordPending, input);
     const event = { treeId: tree.treeId, memberId: tree.memberId, amountCents: 100, checkoutId: "ch_legacy", paymentId: "pay_legacy" };
@@ -232,14 +235,14 @@ describe("provider payment facts", () => {
   it("does not fabricate a fresh reaction when backfill adds a historical current-day fruit", async () => {
     const { t, tree } = await fixture();
     const rowId = await t.run(ctx => ctx.db.insert("lanterns", { treeId: tree.treeId, memberId: tree.memberId,
-      amountCents: 125, whopCheckoutId: "ch_backfill_only", whopPaymentId: "pay_backfill_only", status: "paid", createdAt: Date.now() - 5000 }));
-    const payment = { rowId, treeId: tree.treeId, memberId: tree.memberId, amountCents: 125,
+      amountCents: 150, whopCheckoutId: "ch_backfill_only", whopPaymentId: "pay_backfill_only", status: "paid", createdAt: Date.now() - 5000 }));
+    const payment = { rowId, treeId: tree.treeId, memberId: tree.memberId, amountCents: 150,
       checkoutId: "ch_backfill_only", paymentId: "pay_backfill_only", paidAt: Date.now() - 1000 };
     await t.mutation(internal.lanterns.backfillPaymentFacts, payment);
     const state = await t.query(api.days.today, { deviceId, treeId: tree.treeId });
-    expect(state?.fruits).toHaveLength(1);
+    expect(state?.fruits).toHaveLength(3);
     expect(state?.wateringEvent).toBeNull();
-    expect(state?.streaks.giving).toMatchObject({ count: 1, totalCents: 125 });
+    expect(state?.streaks.giving).toMatchObject({ count: 1, totalCents: 150 });
     expect((await t.run(ctx => ctx.db.get(rowId)))?.confirmedAt).toBeUndefined();
   });
 
@@ -254,7 +257,7 @@ describe("provider payment facts", () => {
     await t.mutation(internal.lanterns.backfillPaymentFacts, { ...event, rowId, paidAt: Date.now() - 1000 });
     await t.mutation(internal.lanterns.applyPayment, { ...event, paidAt: Date.now() - 1000 });
     const state = await t.query(api.days.today, { deviceId, treeId: tree.treeId });
-    expect(state?.fruits).toHaveLength(1);
+    expect(state?.fruits).toHaveLength(2);
     expect(state?.wateringEvent).toBeNull();
     expect(state?.streaks.giving).toMatchObject({ count: 1, totalCents: 100 });
     expect((await t.run(ctx => ctx.db.get(rowId)))?.confirmedAt).toBeUndefined();

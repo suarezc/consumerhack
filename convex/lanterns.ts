@@ -1,16 +1,17 @@
-import { WhopClient, WhopEnvironment } from "@whop/sdk";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { action, internalAction, internalMutation, internalQuery } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { readableDay, requireMember } from "./access";
-import { bundleCents, matchLantern, requireSandbox, sandboxCheckoutUrl, validateAmount, verifyPayment, WHOP_API_VERSION, type VerifiedPayment } from "./lib/payments";
+import { bundleCents, matchLantern, requireSandbox, validateAmount, verifyPayment, type VerifiedPayment } from "./lib/payments";
 import { ritualWindow } from "./questions";
 import { ensureDay } from "./lifecycle";
 import { ensureSackCause } from "./charity";
 import { ensureMemberUser } from "./identity";
 import { refreshClosedImpact } from "./impact";
+import { queuePaidUserNotifications } from "./notifications";
+import { assertExpectedRecipient, createDirectCheckout, sandboxDirectClient as client } from "./lib/whopDirect";
 
 const checkoutArgs = {
   deviceId: v.string(),
@@ -35,19 +36,6 @@ async function authorizeCheckout(ctx: QueryCtx | MutationCtx, args: {
     }
   }
   return member;
-}
-
-function client() {
-  requireSandbox(process.env.WHOP_ENVIRONMENT);
-  const token = process.env.WHOP_API_KEY;
-  if (!token) throw new Error("Sandbox payments are not configured");
-  return new WhopClient({
-    token,
-    environment: WhopEnvironment.Sandbox,
-    apiVersionDate: WHOP_API_VERSION,
-    timeoutInSeconds: 3,
-    maxRetries: 0,
-  });
 }
 
 const paymentArgs = {
@@ -77,14 +65,15 @@ export const prepareWatering = internalMutation({
     if (!answer || (args.answerId && args.answerId !== answer._id)) throw new Error("Answer today's question before watering");
     const cause = await ctx.db.get(day.causeId ?? await ensureSackCause(ctx));
     if (!cause?.childAccountId) throw new Error("The example charity's sandbox account is not configured");
+    if ((cause.applicationFeeCents ?? 0) !== 0) throw new Error("Platform fee is not approved");
     const userId = await ensureMemberUser(ctx, member);
     const wateringId = await ctx.db.insert("lanterns", { treeId: args.treeId, memberId: member._id, userId,
       dayId: day._id, answerId: answer._id, bundles: args.bundles, amountCents, attribution: "checkout_day",
       creditedDate: day.ritualDate ?? day.date, expectedRecipientAccountId: cause.childAccountId,
-      applicationFeeCents: cause.applicationFeeCents, status: "pending", whopCheckoutId: "", source: "whop",
+      applicationFeeCents: cause.applicationFeeCents ?? 0, status: "pending", whopCheckoutId: "", source: "whop",
       demoRunId: day.isDemo ? day._id : undefined, createdAt: Date.now() });
     return { wateringId, treeId: args.treeId, memberId: member._id, userId, dayId: day._id, answerId: answer._id,
-      bundles: args.bundles, amountCents, expectedRecipientAccountId: cause.childAccountId, applicationFeeCents: cause.applicationFeeCents };
+      bundles: args.bundles, amountCents, expectedRecipientAccountId: cause.childAccountId, applicationFeeCents: cause.applicationFeeCents ?? 0 };
   },
 });
 
@@ -108,18 +97,16 @@ export const createWateringCheckout = internalAction({
     const intent = await ctx.runMutation(internal.lanterns.prepareWatering, args);
     let configuration;
     try {
-      configuration = await whop.checkoutConfigurations.create({ account_id: intent.expectedRecipientAccountId,
-        variant: { title: "S.A.C.K. example watering", billing_type: "one_time", initial_price: intent.amountCents / 100,
-          currency: "usd", ...(intent.applicationFeeCents === undefined ? {} : { application_fee_amount: intent.applicationFeeCents / 100 }) },
-        metadata: { integration: "storytime-watering-sandbox-v2", treeId: intent.treeId, memberId: intent.memberId,
-          userId: intent.userId, dayId: intent.dayId, answerId: intent.answerId, bundles: intent.bundles },
+      if (intent.applicationFeeCents !== 0) throw new Error("Platform fee is not approved");
+      configuration = await createDirectCheckout(whop, { recipientAccountId: intent.expectedRecipientAccountId,
+        intentId: intent.wateringId, userId: intent.userId, dayId: intent.dayId, treeId: intent.treeId,
+        memberId: intent.memberId, answerId: intent.answerId, bundles: intent.bundles, applicationFeeCents: 0,
       });
     } catch {
       throw new Error("Sandbox charity checkout is temporarily unavailable");
     }
-    const checkoutUrl = sandboxCheckoutUrl(configuration.purchase_url);
-    await ctx.runMutation(internal.lanterns.attachCheckout, { wateringId: intent.wateringId, checkoutId: configuration.id });
-    return { wateringId: intent.wateringId, checkoutUrl };
+    await ctx.runMutation(internal.lanterns.attachCheckout, { wateringId: intent.wateringId, checkoutId: configuration.checkoutId });
+    return { wateringId: intent.wateringId, checkoutUrl: configuration.checkoutUrl };
   },
 });
 
@@ -127,26 +114,47 @@ export const recordCauseAccount = internalMutation({
   args: { accountId: v.string(), applicationFeeCents: v.optional(v.number()) },
   handler: async (ctx, { accountId, applicationFeeCents }) => {
     requireSandbox(process.env.WHOP_ENVIRONMENT);
-    if (!/^biz_[A-Za-z0-9]+$/.test(accountId) || (applicationFeeCents !== undefined && applicationFeeCents !== 1)) throw new Error("Invalid example charity account configuration");
+    if (!/^biz_[A-Za-z0-9]+$/.test(accountId) || (applicationFeeCents !== undefined && applicationFeeCents !== 0)) throw new Error("Invalid example charity account configuration");
     const causeId = await ensureSackCause(ctx);
-    await ctx.db.patch(causeId, { childAccountId: accountId, applicationFeeCents });
+    await ctx.db.patch(causeId, { childAccountId: accountId, applicationFeeCents: applicationFeeCents ?? 0 });
   },
 });
 
-async function fillPaidFacts(ctx: MutationCtx, row: Doc<"lanterns">, payment: VerifiedPayment) {
+async function missingPaidFacts(ctx: MutationCtx, row: Doc<"lanterns">, payment: VerifiedPayment) {
   if (row.source === "demo") throw new Error("Synthetic payment cannot be provider confirmed");
   matchLantern(row, payment);
-  if (payment.paidAt === undefined) return;
-  if (!Number.isFinite(payment.paidAt) || payment.paidAt <= 0 ||
-      (row.paidAt !== undefined && row.paidAt !== payment.paidAt)) throw new Error("Conflicting provider timestamp");
-  const date = ritualWindow(payment.paidAt).date;
-  if (row.creditedDate !== undefined && row.creditedDate !== date) throw new Error("Conflicting credited date");
-  const facts = {
+  if (payment.paidAt !== undefined && (!Number.isFinite(payment.paidAt) || payment.paidAt <= 0 ||
+      (row.paidAt !== undefined && row.paidAt !== payment.paidAt))) throw new Error("Conflicting provider timestamp");
+  let date = payment.paidAt === undefined ? row.creditedDate : ritualWindow(payment.paidAt).date;
+  let day = row.dayId ? await ctx.db.get(row.dayId) : null;
+  if (row.attribution === "checkout_day") {
+    if (!day || day.treeId !== row.treeId) throw new Error("Authorized watering day is not available");
+    date = day.ritualDate ?? day.date;
+  }
+  if (row.creditedDate !== undefined && date !== undefined && row.creditedDate !== date) throw new Error("Conflicting credited date");
+  if (!day && date) day = await ctx.db.query("days").withIndex("by_tree_date", q => q.eq("treeId", row.treeId).eq("date", date)).unique();
+  const member = await ctx.db.get(row.memberId);
+  const userId = row.userId ?? (member ? await ensureMemberUser(ctx, member) : undefined);
+  const bundles = row.bundles ?? (payment.amountCents % 50 === 0 ? payment.amountCents / 50 : undefined);
+  return {
     ...(row.paidAt === undefined ? { paidAt: payment.paidAt } : {}),
     ...(row.creditedDate === undefined ? { creditedDate: date } : {}),
     ...(row.source === undefined ? { source: "whop" as const } : {}),
+    ...(row.userId === undefined && userId ? { userId } : {}),
+    ...(row.dayId === undefined && day ? { dayId: day._id } : {}),
+    ...(row.bundles === undefined && bundles !== undefined ? { bundles } : {}),
+    ...(row.attribution === undefined ? { attribution: "provider_day" as const } : {}),
   };
-  if (Object.keys(facts).length) await ctx.db.patch(row._id, facts);
+}
+
+async function fillPaidFacts(ctx: MutationCtx, row: Doc<"lanterns">, payment: VerifiedPayment) {
+  const facts = await missingPaidFacts(ctx, row, payment);
+  const changed = Object.values(facts).some(value => value !== undefined);
+  if (!changed) return;
+  await ctx.db.patch(row._id, facts);
+  await refreshClosedImpact(ctx, row.dayId ?? facts.dayId);
+  const member = await ctx.db.get(row.memberId);
+  if (member && !member.isDemo) await queuePaidUserNotifications(ctx, member.deviceId);
 }
 
 export const checkoutContext = internalQuery({
@@ -218,9 +226,10 @@ export const applyPayment = internalMutation({
       await fillPaidFacts(ctx, previous, payment);
       return null;
     }
-    const facts = payment.paidAt === undefined ? {} : {
-      paidAt: payment.paidAt, creditedDate: ritualWindow(payment.paidAt).date, confirmedAt: Date.now(),
-    };
+    const basis = lantern.status === "paid" ? { ...lantern, paidAt: undefined, confirmedAt: undefined,
+      ...(lantern.attribution === "checkout_day" ? {} : { dayId: undefined, creditedDate: undefined }) } : lantern;
+    const facts = { ...await missingPaidFacts(ctx, basis, payment),
+      ...(payment.paidAt === undefined ? {} : { confirmedAt: Date.now() }) };
     if (lantern.status === "pending") {
       await ctx.db.patch(lantern._id, { status: "paid", whopPaymentId: payment.paymentId, source: "whop", ...facts });
     } else {
@@ -228,6 +237,13 @@ export const applyPayment = internalMutation({
         treeId: lantern.treeId,
         ...(lantern.answerId ? { answerId: lantern.answerId } : {}),
         memberId: lantern.memberId,
+        userId: basis.userId,
+        dayId: basis.dayId,
+        bundles: basis.bundles,
+        attribution: basis.attribution,
+        expectedRecipientAccountId: lantern.expectedRecipientAccountId,
+        applicationFeeCents: lantern.applicationFeeCents,
+        creditedDate: basis.creditedDate,
         amountCents: lantern.amountCents,
         status: "paid",
         whopCheckoutId: payment.checkoutId,
@@ -238,6 +254,8 @@ export const applyPayment = internalMutation({
         ...facts,
       });
     }
+    await refreshClosedImpact(ctx, basis.dayId ?? facts.dayId);
+    if (!member.isDemo) await queuePaidUserNotifications(ctx, member.deviceId);
     return null;
   },
 });
@@ -247,8 +265,9 @@ export const backfillPage = internalQuery({
   handler: async (ctx, { cursor }) => {
     const page = await ctx.db.query("lanterns").paginate({ cursor, numItems: 25 });
     return { ...page, page: page.page.filter(row => row.status === "paid" && row.source !== "demo" && row.whopPaymentId &&
-      (row.paidAt === undefined || row.creditedDate === undefined || row.source === undefined))
-      .map(row => ({ rowId: row._id, paymentId: row.whopPaymentId! })) };
+      (row.paidAt === undefined || row.creditedDate === undefined || row.source === undefined || row.userId === undefined || row.dayId === undefined ||
+        (row.bundles === undefined && row.amountCents % 50 === 0)))
+      .map(row => ({ rowId: row._id, paymentId: row.whopPaymentId!, expectedRecipientAccountId: row.expectedRecipientAccountId })) };
   },
 });
 
@@ -274,7 +293,8 @@ export const backfillPaidDates = internalAction({
     for (const row of page.page) {
       try {
         const payment = await whop.payments.retrieve({ id: row.paymentId });
-        const verified = verifyPayment(payment, account.id, { paymentId: row.paymentId, accountId: account.id });
+        const expected = row.expectedRecipientAccountId ?? account.id;
+        const verified = verifyPayment(payment, expected, { paymentId: row.paymentId, accountId: expected });
         if (verified.paidAt === undefined) { failed++; continue; }
         await ctx.runMutation(internal.lanterns.backfillPaymentFacts, { ...verified, rowId: row.rowId });
       } catch {
@@ -286,7 +306,7 @@ export const backfillPaidDates = internalAction({
 });
 
 export const receivePayment = internalAction({
-  args: { paymentId: v.string(), accountId: v.string() },
+  args: { paymentId: v.string(), accountId: v.string(), child: v.optional(v.boolean()) },
   handler: async (ctx, event) => {
     const whop = client();
     let payment;
@@ -299,7 +319,21 @@ export const receivePayment = internalAction({
     } catch {
       throw new Error("Sandbox payment verification is temporarily unavailable");
     }
-    await ctx.runMutation(internal.lanterns.applyPayment, verifyPayment(payment, account.id, event));
+    const context = await ctx.runQuery(internal.lanterns.paymentContext, { checkoutId: payment.checkout_configuration_id ?? "" });
+    if (!context) throw new Error("Pending watering not found");
+    const expected = context.expectedRecipientAccountId ?? account.id;
+    if (event.child ? expected === account.id : expected !== account.id) throw new Error("Wrong payment webhook account scope");
+    assertExpectedRecipient(payment, event, expected);
+    await ctx.runMutation(internal.lanterns.applyPayment, verifyPayment(payment, expected, event));
     return null;
+  },
+});
+
+export const paymentContext = internalQuery({
+  args: { checkoutId: v.string() },
+  handler: async (ctx, { checkoutId }) => {
+    if (!checkoutId) return null;
+    const row = await ctx.db.query("lanterns").withIndex("by_checkout", q => q.eq("whopCheckoutId", checkoutId)).first();
+    return row ? { expectedRecipientAccountId: row.expectedRecipientAccountId } : null;
   },
 });

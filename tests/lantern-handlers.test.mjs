@@ -11,7 +11,8 @@ const verified = { treeId: "tree", memberId: "member", amountCents: 500, checkou
 function database() {
   const tables = {
     trees: [{ _id: "tree", cause: { name: "A shared cause" }, demoDayId: "day" }],
-    members: [{ _id: "member", treeId: "tree", deviceId, name: "Member" }],
+    members: [{ _id: "member", treeId: "tree", deviceId, userId: "user", name: "Member" }],
+    users: [{ _id: "user", deviceId }],
     days: [{ _id: "day", treeId: "tree", bloomedAt: 1, isDemo: true }],
     answers: [{ _id: "answer", treeId: "tree", dayId: "day", memberId: "member" }],
     lanterns: [],
