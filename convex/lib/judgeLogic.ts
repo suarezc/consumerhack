@@ -82,7 +82,7 @@ export function eligibleTarget(source: JudgeDay, target: JudgeDay | null, tree: 
   if (!currentBloom(target, tree) || !target || !tree || target.treeId === source.treeId) return false;
   if (source.isDemo) return !!target.isDemo &&
     [0, 1, 2].some((index) => tree.code === fixtureCode(source._id, index));
-  return !target.isDemo;
+  return !target.isDemo && !tree.code.startsWith("judge-fixture:");
 }
 
 export function fixtureCode(dayId: string, index: number) {

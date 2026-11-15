@@ -38,6 +38,7 @@ test("bloom eligibility rejects closed, stale demo and cross-mode targets", () =
   assert.equal(currentBloom(demo, { _id: "sourceTree", demoDayId: "new-run" }), false);
   assert.equal(currentBloom(demo, { _id: "sourceTree", demoDayId: "demo" }), true);
   assert.equal(eligibleTarget(normal, target, tree), true);
+  assert.equal(eligibleTarget(normal, target, { ...tree, code: fixtureCode("old-demo", 0) }), false);
   assert.equal(eligibleTarget(normal, { ...target, isDemo: true }, { ...tree, demoDayId: "target" }), false);
   const fixtureTree = { ...tree, code: fixtureCode("demo", 0), demoDayId: "target" };
   assert.equal(eligibleTarget(demo, { ...target, isDemo: true }, fixtureTree), true);

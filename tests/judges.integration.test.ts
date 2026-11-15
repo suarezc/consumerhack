@@ -128,3 +128,24 @@ it("concurrent first commits write one immutable kindred result per answer", asy
   expect(await t.run((ctx) => ctx.db.query("kindred").collect())).toHaveLength(1);
   expect((await t.query(api.judges.kindred, { dayId: source.dayId, deviceId: source.deviceId })).matches).toHaveLength(0);
 });
+
+it("fixture trees cannot crowd real matches out after replay, morning and bloom", async () => {
+  const t = backend();
+  vi.setSystemTime(new Date("2026-11-15T12:00:00Z"));
+  const source = await addDay(t);
+  const target = await addDay(t, { name: "Real candidate before the replays" });
+  for (let i = 0; i < 11; i++) {
+    const { dayId } = await t.mutation(api.demo.restart, { treeId: source.treeId, deviceId: source.deviceId });
+    await t.run((ctx) => ctx.db.patch(dayId, { bloomedAt: Date.now() }));
+    await t.action(internal.judges.run, { dayId });
+  }
+  expect(await t.run((ctx) => ctx.db.query("trees").collect())).toHaveLength(35);
+  await t.mutation(api.demo.stop, { treeId: source.treeId, deviceId: source.deviceId });
+  vi.setSystemTime(new Date("2026-11-16T22:00:00Z"));
+  await t.mutation(internal.lifecycle.morning);
+  const normalDays = await t.run((ctx) => ctx.db.query("days").filter((q) => q.neq(q.field("isDemo"), true)).collect());
+  for (const day of normalDays) await t.mutation(internal.lifecycle.bloom, { dayId: day._id });
+  await t.action(internal.judges.run, { dayId: source.dayId });
+  const result = await t.query(api.judges.kindred, { dayId: source.dayId, deviceId: source.deviceId });
+  expect(result.matches.map((match) => match.answerId)).toEqual([target.answerId]);
+});

@@ -83,14 +83,16 @@ export const snapshot = internalQuery({
         candidates.push(...await ctx.db.query("answers").withIndex("by_day", (q) => q.eq("dayId", tree.demoDayId!)).collect());
       }
     } else {
-      const days = await ctx.db.query("days").order("desc").filter((q) => q.and(
+      const days = ctx.db.query("days").order("desc").filter((q) => q.and(
         q.neq(q.field("isDemo"), true), q.neq(q.field("bloomedAt"), undefined), q.neq(q.field("treeId"), day.treeId),
-      )).take(32);
-      for (const targetDay of days) {
+      ));
+      let eligibleDays = 0;
+      for await (const targetDay of days) {
         const tree = await ctx.db.get(targetDay.treeId);
         if (!eligibleTarget(day, targetDay, tree)) continue;
+        eligibleDays += 1;
         candidates.push(...await ctx.db.query("answers").withIndex("by_day", (q) => q.eq("dayId", targetDay._id)).take(128 - candidates.length));
-        if (candidates.length === 128) break;
+        if (candidates.length === 128 || eligibleDays === 32) break;
       }
     }
     return {
