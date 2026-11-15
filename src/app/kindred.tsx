@@ -19,7 +19,7 @@ function KindredAnswers() {
 
   return <Screen title="Somewhere, someone understands."><TreeNavigation />
     {today === null ? <Empty title="Today is still taking shape." message="No question is available for this tree yet." />
-      : result === undefined ? <ScreenState status="loading" title="Finding your kindred…" />
+      : today === undefined || result === undefined ? <ScreenState status="loading" title="Finding your kindred…" />
       : result.status === "locked" ? <Empty title="A little patience." message="Answer today’s question and wait for the bloom to find kindred answers from other trees." />
       : result.status === "pending" ? <ScreenState status="loading" title="Finding a shared feeling…" message="The judges are still listening. Your kindred answers will appear here." />
       : result.matches.length === 0 ? <Empty title="A quiet day." message="No kindred answers were found for this day. Your circle is still waiting in Bloom." />
