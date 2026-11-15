@@ -11,7 +11,7 @@ import { ensureSackCause } from "./charity";
 import { ensureMemberUser } from "./identity";
 import { refreshClosedImpact } from "./impact";
 import { queuePaidUserNotifications } from "./notifications";
-import { assertExpectedRecipient, createDirectCheckout, sandboxDirectClient as client } from "./lib/whopDirect";
+import { assertExpectedRecipient, createDirectCheckout, ensureExampleSubaccount, sandboxDirectClient as client } from "./lib/whopDirect";
 
 const checkoutArgs = {
   deviceId: v.string(),
@@ -117,6 +117,15 @@ export const recordCauseAccount = internalMutation({
     if (!/^biz_[A-Za-z0-9]+$/.test(accountId) || (applicationFeeCents !== undefined && applicationFeeCents !== 0)) throw new Error("Invalid example charity account configuration");
     const causeId = await ensureSackCause(ctx);
     await ctx.db.patch(causeId, { childAccountId: accountId, applicationFeeCents: applicationFeeCents ?? 0 });
+  },
+});
+
+export const configureExampleCause = internalAction({
+  args: {},
+  handler: async (ctx): Promise<{ accountId: string; applicationFeeCents: 0 }> => {
+    const account = await ensureExampleSubaccount(client());
+    await ctx.runMutation(internal.lanterns.recordCauseAccount, { accountId: account.accountId, applicationFeeCents: 0 });
+    return { accountId: account.accountId, applicationFeeCents: 0 };
   },
 });
 

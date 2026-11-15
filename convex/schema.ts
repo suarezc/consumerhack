@@ -43,6 +43,7 @@ export default defineSchema({
     createdAt: v.number(),
     demoDayId: v.optional(v.id("days")),
     questionCursor: v.optional(v.number()),
+    questionUsed: v.optional(v.array(v.number())),
   }).index("by_code", ["code"]),
 
   members: defineTable({

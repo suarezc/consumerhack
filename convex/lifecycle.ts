@@ -19,10 +19,15 @@ export async function ensureDay(ctx: MutationCtx, treeId: Id<"trees">) {
   }
   const tree = await ctx.db.get(treeId);
   if (!tree) throw new Error("Tree not found");
-  const cursor = tree.questionCursor ?? 0;
-  const questionIndex = cursor % questions.length;
+  const history = tree.questionUsed ? [] : await ctx.db.query("days").withIndex("by_tree", q => q.eq("treeId", treeId)).collect();
+  const used = new Set(tree.questionUsed ?? history.filter(day => !day.isDemo)
+    .map(day => questions.indexOf(day.question)).filter(index => index >= 0));
+  if (used.size === questions.length) used.clear();
+  let questionIndex = (tree.questionCursor ?? 0) % questions.length;
+  while (used.has(questionIndex)) questionIndex = (questionIndex + 1) % questions.length;
+  used.add(questionIndex);
   const dayId = await ctx.db.insert("days", { treeId, ...window, question: questions[questionIndex], questionIndex, charity: sackCharity, causeId });
-  await ctx.db.patch(treeId, { questionCursor: cursor + 1 });
+  await ctx.db.patch(treeId, { questionCursor: (questionIndex + 1) % questions.length, questionUsed: [...used] });
   await ctx.scheduler.runAt(Math.max(Date.now(), window.bloomAt), internal.lifecycle.bloom, { dayId });
   return dayId;
 }
