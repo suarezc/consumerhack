@@ -1,6 +1,6 @@
 # Giving-streak widgets (opt-in; separate enabled and disabled candidates)
 
-**Activation is paused for the response-fruit / paid-light product change.** This branch still has the historical giving-peach presentation pending a separately scoped giving-light/firefly motif update. Capability work remains reusable, but the old fruit semantics and visual checks are not current product acceptance. The privacy clear fix is independent of that semantic change; no Apple/build action is authorized here.
+**Current direction: original colorful peach giving-streak widgets.** Charles explicitly restored the supplied peach artwork; the firefly widget experiment is excluded. Scalar-only query projection and the reviewed privacy/race fix are retained. App response fruits and paid shared-tree lights remain independent of this personal giving-streak metaphor. Source-based renders are not native proof; existing integration/signing owners remain responsible for the enabled build.
 
 This is a native SwiftUI layout compiled by SDK58 `expo-widgets` into WidgetKit, not an HTML screenshot. It supports small/medium Home Screen and accessory circular Lock Screen. Transparent offline illustrations are derived from the unchanged supplied board. Bricolage/Inter are extension-only. Native compilation, provisioning, device screenshots and app mounting remain with Build/QA; JavaScript/prebuild checks are not native visual proof.
 
@@ -45,12 +45,12 @@ The snapshot is a versioned presentation projection, not a stored authoritative 
 {
   version: 1, asOf, dayKey, nextBoundaryAt,
   giving: { count, status }, hasPriorGiving, historyComplete,
-  fruitCount, goldenFruitCount, totalRaisedCents, answererCount,
+  totalRaisedCents, answererCount,
   currency: "USD", sandbox: true
 }
 ```
 
-`fruitCount/goldenFruitCount` count only the viewer's `source:'whop'` query fruits. They stay in the app adapter's projection; unused counts, IDs, day keys and lifetime money are not persisted in the extension's rendered props. No device ID, provider/payment ID, invite code, answer text, user name, tree name or access token reaches the extension. The App Group receives only static sanitized artwork and dated display props (count, state, copy, formatted public totals, expiry and local image paths). No separate raw snapshot file or authoritative counter is written. UserDefaults in the App Group is not a secret store. Lock Screen/Home Screen privacy and personalization require product review; root `privacySensitive()` allows system redaction but is not authentication. A clear requests WidgetKit reload; iOS may retain an already-rendered image until it schedules that refresh.
+The adapter does not read Today.fruits and does not project fruitCount/goldenFruitCount. Only day/streak/currency/history and daily public-total scalars are consumed. No device ID, provider/payment ID, invite code, answer text, user name, tree name or access token reaches the extension. The App Group receives only static sanitized artwork and dated display props (count, state, copy, formatted public totals, expiry and local image paths). No separate raw snapshot file or authoritative counter is written. UserDefaults in the App Group is not a secret store. Lock Screen/Home Screen privacy and personalization require product review; root `privacySensitive()` allows system redaction but is not authentication. A clear requests WidgetKit reload; iOS may retain an already-rendered image until it schedules that refresh.
 
 ## States, clock and navigation
 

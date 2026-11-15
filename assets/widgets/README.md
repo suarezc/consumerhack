@@ -2,9 +2,9 @@
 
 Peach geometry, blossom, withered new bud, Lock Screen silhouettes and canopy are derived from the supplied `design/streak-fruit.html` in project Drive. The original board is unchanged. SVG sources are retained here; transparent PNGs are the offline illustration assets inside a native SwiftUI layout, not screenshots of a widget. Thirsty PNGs apply the board's saturation/brightness values at morning/afternoon/evening. No face; thirsty background is provided by the native layout.
 
-Widget maturity is green/small at 1, blush at 3, ripe at 7, gold at 30 (thresholds). This is different from the shared-tree's historical golden milestones **exactly 3/7/30**. The widget never recolors ledger fruits, and `goldenFruitCount` is projected from server facts, not its peach palette.
+Widget maturity is green/small at 1, blush at 3, ripe at 7, gold at 30 (thresholds). This is the original personal giving-streak peach metaphor, separate from response fruit and shared-tree paid lights. No fruit or light collection is read by the widget adapter.
 
-The generic canopy intentionally omits the board's illustrative paid fruit, which were not real counts. It accompanies the verified day's answer count and gross sandbox total, not a reconstruction of another person's tree contents.
+The medium tree preserves the board's complete illustration. Its decorative fruit is not a payment/count projection; only the accompanying answer count and gross sandbox total are query facts.
 
 Static widget-only fonts: Bricolage Grotesque (700, optical size14, width100) and Inter (400, optical size14), instantiated from Google Fonts variable sources. PostScript names are `BricolageGrotesque-14ptBold` and `Inter-Regular`. The original OFL licenses are included beside them. Sources:
 

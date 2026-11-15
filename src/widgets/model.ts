@@ -13,13 +13,12 @@ export type WidgetSnapshot = {
   historyComplete: boolean;
   currency: "USD";
   sandbox: true;
-  fruitCount: number;
-  goldenFruitCount: number;
   totalRaisedCents: number;
   answererCount: number;
 };
 
 export type WidgetProps = {
+  presentationVersion: 2;
   state: "blossom" | "healthy" | "thirsty" | "withered" | "unavailable";
   count: number | null;
   stage: 1 | 3 | 7 | 30;
@@ -45,7 +44,7 @@ export function ritualDayKey(now: number): string {
 
 export function emptyWidget(url: string): WidgetProps {
   return {
-    state: "unavailable", count: null, stage: 1, fade: 0,
+    presentationVersion: 2, state: "unavailable", count: null, stage: 1, fade: 0,
     freshness: "missing", freshnessLabel: "Open StoryTime to refresh", expiresAt: null,
     message: "Your giving ritual, one day at a time.",
     totalLabel: "—", answersLabel: "Open today's tree",
@@ -63,7 +62,6 @@ export function isWidgetSnapshot(value: unknown): value is WidgetSnapshot {
     typeof s.hasPriorGiving !== "boolean" || typeof s.historyComplete !== "boolean" ||
     s.currency !== "USD" || s.sandbox !== true || !s.giving || !integer(s.giving.count) ||
     !["current", "at_risk", "none"].includes(s.giving.status) ||
-    !integer(s.fruitCount) || !integer(s.goldenFruitCount) || s.goldenFruitCount > s.fruitCount ||
     !integer(s.totalRaisedCents) || !integer(s.answererCount)) return false;
   if (s.asOf > 8.64e15 || s.nextBoundaryAt > 8.64e15) return false;
   const start = Date.parse(`${s.dayKey}T06:00:00.000Z`);
@@ -93,8 +91,8 @@ export function widgetAt(snapshot: WidgetSnapshot | null, now: number, url: stri
     freshness: aging ? "aging" : "confirmed",
     freshnessLabel: `${aging ? "Last synced" : "As of"} ${time} UTC`,
     message: state === "healthy" ? "Watered today." : state === "thirsty" ?
-      "Thirsty. Open to answer, then water." : state === "withered" ?
-        "A new bud. Begin again today." : "Answer, then water your first fruit.",
+      "Thirsty. Water today to keep it." : state === "withered" ?
+        "Your peach dried. Water to grow a new one." : "Water to grow your first fruit.",
     totalLabel: `$${(snapshot.totalRaisedCents / 100).toFixed(2)}`,
     answersLabel: `${snapshot.answererCount} answered`,
   };
