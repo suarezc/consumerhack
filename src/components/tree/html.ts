@@ -1,3 +1,5 @@
+import { FRUIT_RUNTIME } from "./fruitRuntime";
+
 export const TREE_HTML = String.raw`<!doctype html>
 <html lang="en">
 <head>
@@ -224,6 +226,9 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
 
   const tree = buildTree(11);
   const CAP = tree.buds.length;
+
+${FRUIT_RUNTIME}
+  const fruitLayer = createFruitLayer();
 
   const scene = document.getElementById("scene");
   const cv = document.getElementById("sky");
@@ -701,6 +706,8 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
       ctx.fill();
     }
 
+    fruitLayer.draw(ctx, { buds, unit: U, rootX: baseX, rootY: groundY + 3, glow }, clockT, still);
+
     if (
       selected >= 0 &&
       buds[selected] &&
@@ -961,6 +968,7 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
     if (!initialized || reset || still) bloom = bloomTarget;
     revision = value.revision;
     initialized = true;
+    fruitLayer.update(value.fruits, value.wateringEvent, animationTime(), still);
     if (!still)
       arrivals.slice(-12).forEach(function (i) {
         if (pending[i]) return;
