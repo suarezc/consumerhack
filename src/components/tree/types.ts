@@ -26,6 +26,9 @@ export type TreeProps = {
   mine: number[];
   notes: TreeNote[];
   lanterns: number;
+  lightBundles?: number;
+  goldenLightBundles?: number;
+  lightEvent?: { id: string; revision: number; lightBundles: number } | null;
   fruits?: readonly TreeFruit[];
   wateringEvent?: TreeWateringEvent | null;
   onTapBlossom?: (index: number) => void;

@@ -67,6 +67,25 @@ export function getTreeDataStatus(
 
 export function normalizeTreeState(props: TreeProps) {
   const answers = normalizeAnswerCount(props.answers);
+  const lightBundles = count(props.lightBundles ?? 0, 1000);
+  const event = props.lightEvent;
+  const lightEvent =
+    event &&
+    typeof event.id === "string" &&
+    event.id.length > 0 &&
+    event.id.length <= 128 &&
+    /^[\x00-\x7f]+$/.test(event.id) &&
+    Number.isSafeInteger(event.revision) &&
+    event.revision > 0 &&
+    Number.isInteger(event.lightBundles) &&
+    event.lightBundles > 0 &&
+    event.lightBundles <= 1000
+      ? {
+          id: event.id,
+          revision: event.revision,
+          lightBundles: event.lightBundles,
+        }
+      : null;
   const validIndex = (value: number) =>
     Number.isInteger(value) && value >= 0 && value < answers;
   return {
@@ -95,6 +114,16 @@ export function normalizeTreeState(props: TreeProps) {
           }))
       : [],
     lanterns: count(props.lanterns, 64),
+    ...(props.lightBundles !== undefined
+      ? {
+          lightBundles,
+          goldenLightBundles: count(
+            props.goldenLightBundles ?? 0,
+            lightBundles,
+          ),
+        }
+      : {}),
+    ...(props.lightEvent !== undefined ? { lightEvent } : {}),
     fruits: normalizeFruits(props.fruits).map((fruit) => ({
       ...fruit,
       anchor: fruitAnchorSeed(fruit.id),

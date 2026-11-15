@@ -1,4 +1,5 @@
 import { FRUIT_RUNTIME } from "./fruitRuntime";
+import { LIGHT_RUNTIME } from "./lightRuntime";
 import { TREE_MAX_FRUITS, TREE_MAX_EVENT_FRUITS, TREE_MAX_STATE_LENGTH } from "./limits";
 
 export const TREE_HTML = String.raw`<!doctype html>
@@ -230,6 +231,9 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
 
 ${FRUIT_RUNTIME}
   const fruitLayer = createFruitLayer();
+${LIGHT_RUNTIME}
+  const bundleLightLayer = createBundleLightLayer();
+  let lightBundles = null;
 
   const scene = document.getElementById("scene");
   const cv = document.getElementById("sky");
@@ -708,6 +712,7 @@ ${FRUIT_RUNTIME}
     }
 
     fruitLayer.draw(ctx, { buds, unit: U, rootX: baseX, rootY: groundY + 3, glow }, clockT, still);
+    bundleLightLayer.draw(ctx, { buds, unit: U, rootX: baseX, rootY: groundY + 3, width: W, height: H, glow, night: nf }, clockT, still);
 
     if (
       selected >= 0 &&
@@ -775,7 +780,7 @@ ${FRUIT_RUNTIME}
     ctx.globalAlpha = 1;
 
     ctx.restore();
-    if (nf > 0.2 && !still) {
+    if (nf > 0.2 && !still && lightBundles === null) {
       ctx.save();
       ctx.translate(-px * 46, -py * 14);
       ctx.fillStyle = "#ffe6a8";
@@ -920,6 +925,7 @@ ${FRUIT_RUNTIME}
       !Array.isArray(value.notes) ||
       !Number.isInteger(value.lanterns) ||
       value.lanterns < 0 ||
+      (value.lightBundles !== undefined && (!Number.isInteger(value.lightBundles) || value.lightBundles < 0 || value.lightBundles > 1000)) ||
       (Array.isArray(value.fruits) && value.fruits.length > ${TREE_MAX_FRUITS}) ||
       (Array.isArray(value.wateringEvent?.fruitIds) && value.wateringEvent.fruitIds.length > ${TREE_MAX_EVENT_FRUITS})
     )
@@ -971,7 +977,11 @@ ${FRUIT_RUNTIME}
     if (!initialized || reset || still) bloom = bloomTarget;
     revision = value.revision;
     initialized = true;
-    fruitLayer.update(value.fruits, value.wateringEvent, animationTime(), still);
+    fruitLayer.update(value.fruits, value.lightBundles !== undefined || value.lightEvent !== undefined ? null : value.wateringEvent, animationTime(), still);
+    if (value.lightBundles !== undefined) {
+      lightBundles = value.lightBundles;
+      bundleLightLayer.update(lightBundles, value.goldenLightBundles, value.lightEvent, animationTime(), still);
+    }
     if (!still)
       arrivals.slice(-12).forEach(function (i) {
         if (pending[i]) return;
