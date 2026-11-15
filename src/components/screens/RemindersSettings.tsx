@@ -5,7 +5,8 @@ import { useReminders } from "@/providers/NotificationProvider";
 
 export function RemindersSettings() {
   const { status, busy, lastAction, update } = useReminders();
-  const message = !status ? "Checking reminder settings…"
+  const message = busy && lastAction === "out" ? "Turning off reminders… waiting for server confirmation."
+    : !status ? "Checking reminder settings…"
     : status.state === "off" ? "Reminders are off."
     : status.state === "registered" ? "This device is registered for reminders. Registration is not a delivery confirmation."
     : status.state === "denied" ? "Notifications are denied in system settings. You can allow them there, then check again."
@@ -23,7 +24,7 @@ export function RemindersSettings() {
       label={status.state === "denied" || status.state === "sync_failed" ? "Check reminder settings" : "Allow reminders"}
       loading={busy && lastAction !== "out"} disabled={busy && lastAction === "out"}
       onPress={() => { void update(status.state === "denied" || status.state === "sync_failed" ? "retry" : "in"); }} />}
-    {(status?.optIn || busy || status?.state === "sync_failed") && <StoryButton label="Turn reminders off" tone="quiet"
+    {(!status || status.optIn || busy || status.state === "sync_failed") && <StoryButton label="Turn reminders off" tone="quiet"
       loading={busy && lastAction === "out"} onPress={() => { void update("out"); }} />}
   </View>;
 }
