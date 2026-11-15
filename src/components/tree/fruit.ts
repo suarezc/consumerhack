@@ -1,7 +1,10 @@
 import type { TreeFruit, TreeWateringEvent } from "./types";
+import { TREE_MAX_ID_LENGTH } from "./limits";
 
 const validId = (value: unknown): value is string =>
-  typeof value === "string" && value.length > 0 && value.length <= 256;
+  typeof value === "string" &&
+  value.length > 0 &&
+  value.length <= TREE_MAX_ID_LENGTH;
 
 export function normalizeFruits(value: unknown): TreeFruit[] {
   if (!Array.isArray(value)) return [];
@@ -20,9 +23,9 @@ export function normalizeFruits(value: unknown): TreeFruit[] {
       ...(typeof fruit.mine === "boolean" ? { mine: fruit.mine } : {}),
     });
   }
-  return [...fruits.values()]
-    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-    .slice(0, 64);
+  return [...fruits.values()].sort((a, b) =>
+    a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
+  );
 }
 
 export function normalizeWateringEvent(
@@ -39,7 +42,21 @@ export function normalizeWateringEvent(
     revision < 1
   )
     return null;
-  return { id: event.id, fruitId: event.fruitId, revision };
+  if (
+    event.fruitIds !== undefined &&
+    (!Array.isArray(event.fruitIds) ||
+      !event.fruitIds.length ||
+      !event.fruitIds.every(validId))
+  )
+    return null;
+  return {
+    id: event.id,
+    fruitId: event.fruitId,
+    revision,
+    ...(event.fruitIds !== undefined
+      ? { fruitIds: [...new Set(event.fruitIds)] }
+      : {}),
+  };
 }
 
 export function fruitAnchorSeed(id: string) {

@@ -11,8 +11,19 @@ function createWateringTracker() {
         validId(value.id) &&
         validId(value.fruitId) &&
         Number.isSafeInteger(value.revision) &&
-        value.revision >= 1
-          ? { id: value.id, fruitId: value.fruitId, revision: value.revision }
+        value.revision >= 1 &&
+        (value.fruitIds === undefined ||
+          (Array.isArray(value.fruitIds) &&
+            value.fruitIds.length > 0 &&
+            value.fruitIds.every(validId)))
+          ? {
+              id: value.id,
+              fruitId: value.fruitId,
+              revision: value.revision,
+              ...(value.fruitIds !== undefined
+                ? { fruitIds: [...new Set(value.fruitIds)] }
+                : {}),
+            }
           : null;
       if (!initialized) {
         initialized = true;
@@ -22,7 +33,9 @@ function createWateringTracker() {
       if (
         !event ||
         consumed.has(event.id) ||
-        !fruits.some((fruit) => fruit.id === event.fruitId)
+        !(event.fruitIds ?? [event.fruitId]).every((id) =>
+          fruits.some((fruit) => fruit.id === id),
+        )
       )
         return null;
       consumed.add(event.id);
@@ -78,14 +91,14 @@ function createFruitLayer() {
             return false;
           ids.add(fruit.id);
           return true;
-        })
-        .slice(0, 64);
+        });
       const eligible = tracker.observe(event, fruits);
       effects = effects.filter((effect) =>
-        fruits.some((fruit) => fruit.id === effect.fruitId),
+        effect.fruitIds.some((id) => fruits.some((fruit) => fruit.id === id)),
       );
       if (reduced) effects = [];
-      else if (eligible) effects.push({ fruitId: eligible.fruitId, t0: now });
+      else if (eligible)
+        effects.push({ fruitIds: eligible.fruitIds ?? [eligible.fruitId], t0: now });
       if (effects.length > 6) effects.splice(0, effects.length - 6);
     },
     draw(ctx, geometry, now, reduced) {
@@ -100,7 +113,7 @@ function createFruitLayer() {
         if (
           !point ||
           effects.some(
-            (effect) => effect.fruitId === fruit.id && now - effect.t0 < 1.65,
+            (effect) => effect.fruitIds.includes(fruit.id) && now - effect.t0 < 1.65,
           )
         )
           continue;
@@ -164,9 +177,11 @@ function createFruitLayer() {
         }
       }
       for (const effect of effects) {
-        const age = Math.max(0, now - effect.t0),
-          fruit = fruits.find((fruit) => fruit.id === effect.fruitId);
-        if (!fruit) continue;
+        const age = Math.max(0, now - effect.t0);
+        const targets = effect.fruitIds
+          .map((id) => fruits.find((fruit) => fruit.id === id))
+          .filter(Boolean);
+        if (!targets.length) continue;
         const rootX = geometry.rootX,
           rootY = geometry.rootY;
         if (age < 0.75) {
@@ -213,27 +228,29 @@ function createFruitLayer() {
           Math.PI * 2,
         );
         ctx.stroke();
-        const point = target(fruit, geometry);
-        if (point && age >= 0.65) {
-          const p = ease((age - 0.65) / 1),
-            v = 1 - p,
-            x = v * rootX + p * point.x,
-            y =
-              v * v * rootY +
-              2 * v * p * (point.y - unit * 0.3) +
-              p * p * point.y;
-          ctx.globalAlpha = 1;
-          ctx.drawImage(
-            geometry.glow,
-            x - radius * 3.5,
-            y - radius * 3.5,
-            radius * 7,
-            radius * 7,
-          );
-          ctx.fillStyle = "#fff0c4";
-          ctx.beginPath();
-          ctx.arc(x, y, 2.2, 0, Math.PI * 2);
-          ctx.fill();
+        for (const fruit of targets) {
+          const point = target(fruit, geometry);
+          if (point && age >= 0.65) {
+            const p = ease((age - 0.65) / 1),
+              v = 1 - p,
+              x = v * rootX + p * point.x,
+              y =
+                v * v * rootY +
+                2 * v * p * (point.y - unit * 0.3) +
+                p * p * point.y;
+            ctx.globalAlpha = 1;
+            ctx.drawImage(
+              geometry.glow,
+              x - radius * 3.5,
+              y - radius * 3.5,
+              radius * 7,
+              radius * 7,
+            );
+            ctx.fillStyle = "#fff0c4";
+            ctx.beginPath();
+            ctx.arc(x, y, 2.2, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
       }
       ctx.restore();

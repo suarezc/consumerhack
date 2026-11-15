@@ -1,4 +1,5 @@
 import { FRUIT_RUNTIME } from "./fruitRuntime";
+import { TREE_MAX_FRUITS, TREE_MAX_STATE_LENGTH } from "./limits";
 
 export const TREE_HTML = String.raw`<!doctype html>
 <html lang="en">
@@ -892,7 +893,7 @@ ${FRUIT_RUNTIME}
     schedule(true);
   }
   function receive(event) {
-    if (typeof event.data !== "string" || event.data.length > 100000) return;
+    if (typeof event.data !== "string" || event.data.length > ${TREE_MAX_STATE_LENGTH}) return;
     let value;
     try {
       value = JSON.parse(event.data);
@@ -918,7 +919,9 @@ ${FRUIT_RUNTIME}
       !Array.isArray(value.mine) ||
       !Array.isArray(value.notes) ||
       !Number.isInteger(value.lanterns) ||
-      value.lanterns < 0
+      value.lanterns < 0 ||
+      (Array.isArray(value.fruits) && value.fruits.length > ${TREE_MAX_FRUITS}) ||
+      (Array.isArray(value.wateringEvent?.fruitIds) && value.wateringEvent.fruitIds.length > ${TREE_MAX_FRUITS})
     )
       return;
     const nextT = clamp(value.timeOfDay, 0, 1),

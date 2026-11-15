@@ -2,7 +2,11 @@ import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { AccessibilityInfo, AppState, StyleSheet, View } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 
-import { normalizeTreeState, readTreeMessage } from "./tree/bridge";
+import {
+  normalizeTreeState,
+  readTreeMessage,
+  serializeTreeState,
+} from "./tree/bridge";
 import { TREE_HTML } from "./tree/html";
 import type { TreeProps } from "./tree/types";
 
@@ -23,22 +27,30 @@ export function Tree(props: TreeProps) {
   }, [props]);
   const session = useRef<string | null>(null);
   const revision = useRef(0);
+  const allowTaps = useRef(false);
   const active = useRef(AppState.currentState === "active");
   const reduceMotion = useRef(false);
 
   const synchronize = useCallback(() => {
     if (!session.current) return;
-    revision.current += 1;
-    webView.current?.postMessage(
-      JSON.stringify({
-        type: "state",
-        session: session.current,
-        revision: revision.current,
-        ...normalizeTreeState(latest.current),
-        active: active.current,
-        reduceMotion: reduceMotion.current,
-      }),
+    const nextRevision = revision.current + 1;
+    const data = serializeTreeState(
+      latest.current,
+      session.current,
+      nextRevision,
+      active.current,
+      reduceMotion.current,
     );
+    if (data === null) {
+      allowTaps.current = false;
+      console.warn(
+        "Tree snapshot exceeds supported transport limits; no fruits were truncated.",
+      );
+      return;
+    }
+    revision.current = nextRevision;
+    allowTaps.current = true;
+    webView.current?.postMessage(data);
   }, []);
 
   useEffect(synchronize, [
@@ -92,6 +104,7 @@ export function Tree(props: TreeProps) {
         return;
       }
       if (
+        !allowTaps.current ||
         message.session !== session.current ||
         message.revision !== revision.current
       )
@@ -114,6 +127,7 @@ export function Tree(props: TreeProps) {
         }
         onLoadStart={() => {
           session.current = null;
+          allowTaps.current = false;
         }}
         onMessage={onMessage}
         onContentProcessDidTerminate={() => webView.current?.reload()}

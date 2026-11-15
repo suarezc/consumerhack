@@ -13,7 +13,8 @@ function load(name, dependencies = {}) {
   vm.runInNewContext(code, context);
   return context.exports;
 }
-const fruit = load("fruit");
+const limits = load("limits");
+const fruit = load("fruit", { "./limits": limits });
 const { normalizeFruits, normalizeWateringEvent, fruitAnchor } = fruit;
 const runtime = readFileSync(
   new URL("./fruitRuntime.ts", import.meta.url),
@@ -22,7 +23,10 @@ const runtime = readFileSync(
 const { createWateringTracker, createFruitLayer } = vm.runInNewContext(
   runtime + "\n({createWateringTracker,createFruitLayer});",
 );
-const { normalizeTreeState } = load("bridge", { "./fruit": fruit });
+const { normalizeTreeState } = load("bridge", {
+  "./fruit": fruit,
+  "./limits": limits,
+});
 const plain = (value) => JSON.parse(JSON.stringify(value));
 const fruits = Object.freeze([
   Object.freeze({ id: "ledger-a", golden: false, mine: true }),
@@ -93,13 +97,16 @@ test("malformed fruit/events are rejected and duplicate fruit identities render 
     { id: "a", fruitId: "b", revision: 0 },
     { id: "a", fruitId: "b", revision: 1.5 },
     { id: "a", fruitId: "b", revision: Infinity },
+    { id: "a", fruitId: "b", revision: 1, fruitIds: [] },
+    { id: "a", fruitId: "b", revision: 1, fruitIds: null },
+    { id: "a", fruitId: "b", revision: 1, fruitIds: [""] },
   ])
     assert.equal(normalizeWateringEvent(value), null);
   const many = Array.from({ length: 100 }, (_, i) => ({
     id: `ledger-${i}`,
     golden: false,
   }));
-  assert.equal(normalizeFruits(many).length, 64);
+  assert.equal(normalizeFruits(many).length, 100);
   assert.deepEqual(
     plain(normalizeFruits(many)),
     plain(normalizeFruits(many.reverse())),
@@ -273,4 +280,113 @@ test("a confirmed watering pulses roots without changing an ungrown tree", () =>
     false,
   );
   assert.equal(JSON.stringify(scene), before);
+});
+
+for (const count of [2, 3, 5, 10]) {
+  test(`${count} paid bundle fruits get one payment flourish and all arrive`, () => {
+    const paid = Array.from({ length: count }, (_, i) => ({
+      id: `fixture-payment-${count}:${i}`,
+      golden: count === 5,
+    }));
+    const event = {
+      id: `fixture-payment-${count}`,
+      fruitId: paid[0].id,
+      fruitIds: Object.freeze(paid.map((x) => x.id)),
+      revision: 1,
+    };
+    assert.deepEqual(plain(normalizeWateringEvent(event)), event);
+    const layer = createFruitLayer();
+    layer.update([], null, 0, false);
+    layer.update(payload(paid), event, 1, false);
+    const stream = draw(layer, 1.4);
+    assert.equal(
+      stream.filter((x) => x.op === "stroke" && x.stroke === "#d5e6d4").length,
+      1,
+    );
+    assert.equal(
+      stream.filter((x) => x.op === "stroke" && x.stroke === "#ffd27a").length,
+      1,
+    );
+    const arrivals = draw(layer, 2);
+    assert.equal(
+      arrivals.filter((x) => x.op === "arc" && x.args[2] === 2.2).length,
+      count,
+    );
+    const settled = draw(layer, 3);
+    assert.equal(
+      settled.filter(
+        (x) =>
+          x.op === "fill" && x.fill === (count === 5 ? "#ffd27a" : "#d78c78"),
+      ).length,
+      count,
+    );
+    layer.update(
+      payload([...paid].reverse()),
+      { ...event, revision: 2 },
+      4,
+      false,
+    );
+    assert.equal(hasWater(draw(layer, 4.4)), false);
+    assert.deepEqual(draw(layer, 5), settled);
+    const reloaded = createFruitLayer();
+    reloaded.update(payload(paid), event, 0, false);
+    assert.equal(hasWater(draw(reloaded, 0.4)), false);
+    assert.equal(
+      draw(reloaded, 0.4).filter(
+        (x) =>
+          x.op === "fill" && x.fill === (count === 5 ? "#ffd27a" : "#d78c78"),
+      ).length,
+      count,
+    );
+  });
+}
+
+test("a supplied full list is authoritative and waits for every paid fruit", () => {
+  const tracker = createWateringTracker();
+  tracker.observe(null, fruits);
+  const event = {
+    id: "bundle-payment",
+    fruitId: "ledger-a",
+    fruitIds: ["paid-1", "paid-2"],
+    revision: 1,
+  };
+  assert.equal(tracker.observe(event, fruits), null);
+  const partial = [...fruits, { id: "paid-1", golden: false }];
+  assert.equal(tracker.observe(event, partial), null);
+  const complete = [...partial, { id: "paid-2", golden: false }];
+  assert.deepEqual(plain(tracker.observe(event, complete)), event);
+  assert.equal(
+    tracker.observe(
+      { ...event, fruitIds: ["ledger-a"], revision: 2 },
+      complete,
+    ),
+    null,
+  );
+  const withoutFallback = createWateringTracker();
+  withoutFallback.observe(null, []);
+  assert.deepEqual(
+    plain(
+      withoutFallback.observe(
+        event,
+        complete.filter((x) => x.id !== "ledger-a"),
+      ),
+    ),
+    event,
+  );
+});
+
+test("paid fruit collections larger than the former display cap remain complete", () => {
+  const paid = Array.from({ length: 100 }, (_, i) => ({
+    id: `fixture-ledger-${i}`,
+    golden: false,
+  }));
+  const layer = createFruitLayer();
+  const normalized = payload(paid);
+  assert.equal(normalized.length, 100);
+  layer.update(normalized, null, 0, false);
+  assert.equal(
+    draw(layer, 0).filter((x) => x.op === "fill" && x.fill === "#d78c78")
+      .length,
+    100,
+  );
 });

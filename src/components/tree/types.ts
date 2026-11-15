@@ -16,6 +16,7 @@ export type TreeFruit = {
 export type TreeWateringEvent = {
   id: string;
   fruitId: string;
+  fruitIds?: readonly string[];
   revision: number;
 };
 

@@ -1,5 +1,10 @@
 import type { TreeProps } from "./types";
 import {
+  TREE_MAX_FRUITS,
+  TREE_MAX_SESSION_LENGTH,
+  TREE_MAX_STATE_LENGTH,
+} from "./limits";
+import {
   fruitAnchorSeed,
   normalizeFruits,
   normalizeWateringEvent,
@@ -58,7 +63,7 @@ export function readTreeMessage(
     if (
       !message ||
       typeof message.session !== "string" ||
-      message.session.length > 80 ||
+      message.session.length > TREE_MAX_SESSION_LENGTH ||
       !message.session.length
     )
       return null;
@@ -81,4 +86,32 @@ export function readTreeMessage(
   } catch {
     return null;
   }
+}
+
+export function serializeTreeState(
+  props: TreeProps,
+  session: string,
+  revision: number,
+  active: boolean,
+  reduceMotion: boolean,
+): string | null {
+  const state = normalizeTreeState(props);
+  if (
+    state.fruits.length > TREE_MAX_FRUITS ||
+    (state.wateringEvent?.fruitIds?.length ?? 0) > TREE_MAX_FRUITS ||
+    !session.length ||
+    session.length > TREE_MAX_SESSION_LENGTH ||
+    !Number.isSafeInteger(revision) ||
+    revision < 1
+  )
+    return null;
+  const data = JSON.stringify({
+    type: "state",
+    session,
+    revision,
+    ...state,
+    active,
+    reduceMotion,
+  });
+  return data.length <= TREE_MAX_STATE_LENGTH ? data : null;
 }
