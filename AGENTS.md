@@ -1,61 +1,84 @@
 # StoryTime
 
-A thoughtful, nearly meditative daily ritual for small groups. Each tree gets one question a day. Members answer, and every answer becomes a blossom on a shared tree that grows through the day. At bloom time the answers unlock for people who answered. Overnight judges group answers by feeling and, after the bloom, show each person three kindred answers from other trees. Built for the Consumer Mobile Hackathon (https://consumermobilehackathon.com): an Expo app on a phone, with Convex as the backend, Revyl for device testing and Whop for payments. The demo is live on a phone tonight, so a reliable, beautiful demo beats breadth.
+A daily charity-tree ritual: yesterday's impact → today's charity-related question → answer → water the shared tree → live fruit and a computed giving streak. Build for a reliable, beautiful phone demo at the Consumer Mobile Hackathon (https://consumermobilehackathon.com). Preserve Kindred and private notes, but do not expand them before this core loop works.
 
-## Stack
+## Stack and identity
 
-- Expo (SDK 58) with Expo Router and TypeScript. Routes live in `src/app/`; components in `src/components/`. Import from `@/` (maps to `src/`).
-- Convex in `convex/`, dev deployment `gallant-warbler-923`. The app reads `EXPO_PUBLIC_CONVEX_URL` from the committed `.env` (a public URL, not a secret).
-- Machines have `CONVEX_DEPLOY_KEY` set, so `npx convex dev --once` pushes functions and schema without a login. Server secrets (`WHOP_API_KEY`, `WHOP_ENVIRONMENT`, later `OPENAI_API_KEY`, `WHOP_WEBHOOK_SECRET`) live in Convex environment variables (`npx convex env list` shows names). Never put a secret in the app bundle, an `EXPO_PUBLIC_*` variable or the repo.
-- Identity is anonymous: a `deviceId` generated on first launch and stored on the device. No accounts.
-- No Xcode or Android SDK on the machines. Builds and device runs go through Revyl.
+- Expo SDK 58, Expo Router and TypeScript. Routes live in `src/app/`, components in `src/components/`, and `@/` maps to `src/`. No local Xcode or Android SDK; use Revyl for native builds/device runs.
+- Convex functions live in `convex/`, shared development deployment `gallant-warbler-923`. The committed `EXPO_PUBLIC_CONVEX_URL` is public, not a secret. Machines have `CONVEX_DEPLOY_KEY`; deployment and codegen both require an exclusive slot from the Build Captain. Codegen stages remote state even without activation.
+- Server-only secrets include `WHOP_API_KEY`, parent `WHOP_WEBHOOK_SECRET`, child `WHOP_CHILD_WEBHOOK_SECRET`, and optional judge/push credentials. Never place secrets in the repository, app bundle, logs or `EXPO_PUBLIC_*` variables.
+- Anonymous `deviceId` is a device-stored bearer, not a public identity. `users._id` is the stable opaque person ID across memberships and provider metadata. Backfill missing member identities transactionally; do not expose device IDs or push tokens.
 
-## Objects (`convex/schema.ts`)
+## Daily charity and questions
 
-- **trees**: a name, a six-character invite `code`, a host, and an optional `cause` that lanterns raise money for.
-- **members**: a person (`deviceId`) in a tree, with a display name.
-- **days**: one question per tree per day, chosen by a morning cron job, with `bloomAt` and `bloomedAt` once it blooms.
-- **answers**: one per member per day, with text, its `blossom` index on the tree, and a `mood` score and `embedding` filled in by the judges.
-- **kindred**: for an answer, three matches from other trees, each with a one-line reason.
-- **notes**: a private message on someone's answer, drawn on the tree as a fairy light.
-- **lanterns**: a Whop payment hung on a tree or an answer; the only money object. A lantern is `paid` only when the Whop webhook says so.
+- Store each day's charity name, theme, description, link and programs. Seed **S.A.C.K. (Simple Acts of Care and Kindness)** every day for now, themed **Youth mental health and kindness**. Link: https://simpleacts.org/. Description: “Building safer, kinder communities where children feel supported, connected and valued.”
+- Seed Charles's requested programs: “A kindness anthology for K–12 students”, “Parent talks”, “Scholarships”, and “After-school programmes”. These are the requested seed, not a claim that every program has independently been verified on the website.
+- The catalog has at least 20 kindness/mental-health questions (currently 24). Each tree persists its cursor and used indices in the same transaction that inserts a day. Retries/concurrent creation must neither skip entries nor repeat before exhaustion. Initialize a legacy cycle from existing real-day catalog questions; preserve existing daily questions.
+- One authoritative ritual day runs **06:00 UTC to the next 06:00 UTC**. Normal bloom is 21:00 UTC or when everyone answers, whichever comes first. Calendar midnight and device-local midnight are not rollover.
+- Morning closes expired real days into public gross raised cents, distinct answerer count and distinct waterer count, and ensures the current day. Closure is idempotent; verified late settlement recomputes the original closed impact. No stored streak counters.
+- Today displays charity, its daily paid total and the exact CTA **“Water today's tree for S.A.C.K.”**. Legacy `raisedCents`/`lanternCount` aliases remain real tree-wide values; the charity UI uses `totalRaisedCents`.
 
-## Rules
+## Data and money contract
 
-1. Each tree gets one question a day.
-2. Each member gives one answer, and the tree grows a blossom for it.
-3. The tree blooms when everyone has answered or at `bloomAt`, whichever comes first.
-4. You can read answers only if you answered. Enforce this in Convex queries, not in the UI.
-5. After the bloom, you see three kindred answers from other trees, each with one line on what you share.
-6. Notes and reactions are visible only to the author of the answer they're on (and the sender).
-7. Past days form the grove; a missed day is a bare sapling.
-8. A demo switch runs a whole day in about a minute: it compresses the clock for a tree, seeds sample answers and triggers the bloom and the judges on cue. It must work reliably on stage.
+- `trees` hold invite codes, host, optional legacy cause text, question-cycle state and active demo day. `members` associate a person with a tree. `days` hold question, charity/cause, ritual window, bloom and optional closed impact. `answers` retain one answer/member/day, blossom and judge facts. `kindred` and private `notes` retain their existing contracts.
+- `causes` hold charity metadata and the verified sandbox child recipient. `users` provide opaque person identity. `impactViews` record first-open acknowledgement by user/tree/current-day ID.
+- **`lanterns` is the single physical money ledger**, exposed as waterings in the product/API. Never create a parallel waterings ledger or sum two ledgers. Canonical intents/paid records contain `userId`, `dayId`, `bundles`, integer `amountCents`, status and provider checkout/payment identity, plus immutable recipient, fee and attribution facts. Convert cents to dollars only at the SDK boundary.
+- Offer exactly **2/5/10 bundles for $1/$2.50/$5**; one bundle is $0.50. New checkout and explicit synthetic watering require the caller's answer on the current selected day **before or after bloom**. Enforce server-side; the old public checkout alias cannot bypass authorization or presets.
+- Persist a pending canonical intent **before** provider I/O. Capture target day/run, user, answer, bundles, amount, expected recipient and zero application fee. Attach the returned checkout ID to that same intent even if time, cause or active demo changes during I/O.
+- New attribution is `checkout_day`: the captured target day supplies `creditedDate`; actual optional `paidAt` comes only from verified provider `paid_at`. A payment that settles tomorrow still belongs to its authorized original day, including closed impact. Legacy `provider_day` attribution derives its date only from verified provider time. Never invent dates from checkout creation or callback arrival.
+- Additive migration preserves existing ledger IDs, paid amounts and provider identities. A bounded resumable internal backfill verifies already-paid rows and fills only missing facts; it must not promote pending rows, duplicate money, retarget a canonical intent or fabricate a reaction. Integral legacy multiples of 50 cents can infer bundle equivalents (including nonpreset 3 bundles); nondivisible paid amounts retain their money with unknown fruit allocation.
+- Existing legacy checkout links retain original metadata/whole-cent verification semantics; verified legacy contributions are capped at $100, hence at most 200 inferred fruits per payment. Reusable checkout links can produce distinct payment rows, globally deduplicated by provider payment ID, without inheriting an earlier payment's date.
 
-## Screens
+## Payment authority and direct-charge sandbox
 
-1. Join or create a tree by code.
-2. Today: the tree, the question and your answer.
-3. Bloom: tap blossoms to read, leave a note or hang a lantern.
-4. Kindred.
-5. Grove.
+- `WHOP_ENVIRONMENT=sandbox` is mandatory. Use `@whop/sdk` and an inline one-time USD price with exact server-derived bundle amount, opaque user/day/bundle metadata and durable intent idempotency. The app opens the returned URL through `expo-web-browser`; browser close/return never marks money paid.
+- New payments are direct charges to the configured cause's verified child account, captured on the intent as `expectedRecipientAccountId`. Zero application fee means omit the SDK fee field. No automatic fee fallback or silent parent-account fallback. Missing recipient or child signing-secret configuration fails closed.
+- The installed S.A.C.K. **example** sandbox child proves neither charity ownership nor KYC/payout readiness. Do not create another account, request onboarding or send owner/customer email without explicit approval. Internal verified lookup/setup may reuse the existing child. There is no public arbitrary account setter.
+- Parent `POST /whop` retains legacy parent coverage and its own secret. Child-only `POST /whop/children` uses a separate secret/subscription because `child_resource_events:true` excludes parent events. Never replace the parent subscription with the child-only one.
+- Both routes validate the exact raw body using official SDK signatures, timestamp and webhook identity, then retrieve actual sandbox payment facts. Check route scope, immutable recipient, paid status, USD subtotal/tax/total, checkout identity and all captured user/day/bundle/answer bindings. Metadata or a signature alone does not prove a valid paid contribution. Deduplicate atomically by payment ID and preserve replay safeguards.
+- Gross raised cents are not net charity proceeds. Never claim actual donations reached S.A.C.K. Test card: 4242 4242 4242 4242. A checkout configuration, parent payment, simulated webhook or browser test is not genuine child-payment or phone-checkout proof.
 
-## The tree
+## Fruit and streaks
 
-`design/tree.html` is the reference: the canvas tree, palette by time of day, blossoms, fairy-light notes and the answer-landing animation. The app renders it through `src/components/Tree.tsx`, whose props are the contract between the data and the visuals:
+- Every **paid bundle** yields one stable fruit `${wateringId}:${zeroBasedBundleIndex}`. A five-bundle payment creates five fruits. Never emit pending fruit, truncate historical money/fruits silently or use provider IDs/bearers as visual identities.
+- Compute answer/giving sets across all the user's memberships. Several payments/bundles on one date count once toward a giving streak. End today = current; end yesterday = at risk; a complete empty ritual day breaks the run. Preserve undated paid money in all-time giving without inventing unknown dates.
+- Golden fruit belongs to historical contribution dates whose giving run is exactly 3, 7 or 30. Calculate each historical date independently, across memberships, and color all the user's bundles on that date in the shared tree and their Grove.
+- One newly confirmed payment emits one `wateringEvent:{id,fruitId,fruitIds,revision:1}` containing its bundle fruit IDs. New canonical events have at most 10 fruits; an already-issued legacy payment can have up to 200. `confirmedAt` is a new dated paid observation, never assigned by factual backfill. Initial hydration/reload, replay, browser return and old backfill must not replay success feedback; the client baselines/consumes event identity.
+- `streaks.summary` and Today expose server clock and `answer:{count,status}`, `giving:{count,status,longest,totalCents}`, `currency:'USD'`, `isDemo`, `undatedPaidCount`. Fruit DTOs contain opaque `fruitId`, date, golden/milestone, isMine, source and nullable factual paidAt. Grove stays a day array with viewer-only fruit.
 
-- `timeOfDay` 0..1 (0 = 6:00, 1 = 21:00), `answers` (blossom count), `mine` (blossom indices that are the viewer's), `notes` (strands between two blossoms with a light count), `lanterns` (count), `onTapBlossom(index)`.
+## Yesterday, privacy and screens
 
-Change the props only with both sides agreeing. Visual identity: Newsreader (voice) and IBM Plex Mono (meta), the colours in `design/tree.html`, and one visual world set by the time of day rather than system light/dark mode.
+1. Join/create a tree by code.
+2. First open each ritual day shows yesterday's completed tree, fruit, charity/programs and **“N people answered, M watered, $X raised for S.A.C.K.”**; show **“You gave $Y”** privately when applicable, then a button to today's question.
+3. Today shows the charity, question, daily paid total, answer, shared tree and giving streak. Allow watering after the caller answers without requiring bloom.
+4. Bloom preserves blossom reading, private notes and Kindred; do not expand these secondary features. Past days form the Grove, with a missed day a bare sapling.
+- `days.yesterday` returns day/date, tree identity/name, charity, public counts/total, only the viewer's `myGivenCents`, fruits, demo flag and closedAt. No answer text, other people's individual amounts, bearer or provider identities.
+- `days.firstOpen` returns `{clock,todayDayId,shouldShowYesterday,yesterday}|null`. Queries never consume the intro. `days.acknowledgeYesterday({deviceId,treeId,dayId:todayDayId})` is transactional/idempotent per user/tree/day and rejects stale selected days. A new real day or demo run resets the intro.
+- Reading answer text still requires participation **and bloom**, enforced in Convex queries, independently of pre-bloom watering eligibility. Notes/reactions remain visible only to sender and answer author.
 
-## Whop lanterns
+## Demo
 
-The cause-tree framing: lanterns raise money for a cause the tree picks, shown as a running total. Use web checkout, not Whop's native SDK (it has no sandbox and is Swift-only). A Convex action creates the checkout with `@whop/sdk`, the app opens it with `expo-web-browser`, and Whop's `payment.succeeded` webhook hits the Convex HTTP route `/whop`, which marks the lantern paid. Light a lantern from the webhook record, never when the browser closes. `WHOP_ENVIRONMENT` must be `sandbox`; the test card is 4242 4242 4242 4242.
+- A run compresses today's bloom into about one minute and schedules the existing three sample answers. Exactly three prior personal dates contain answers and explicit synthetic giving, so both streaks start at 3/at-risk; today's answer and next watering become 4.
+- Completed yesterday has exactly 40 answerers and 12 distinct synthetic waterers including the host, each with two bundles: $12 gross/24 fruits, viewer $1/two golden fruits. Only the two earlier personal dates are additionally seeded; no duplicate yesterday/fourth prior date.
+- History-only sample members do not inflate current quorum. Current demo fruit starts at zero and adds 2/5/10 per labelled interaction; multiple interactions are allowed with distinct validated request IDs. Retrying the same run/user/request is idempotent and changing its bundle count fails.
+- Synthetic rows are explicitly `source:'demo'`, tagged with run ID and have no provider payment ID. Active run data never enters real totals, real streaks or notification eligibility. Stop/restart hides old fixtures/events; stale answers, requests and scheduled seeds cannot mutate the new run.
+- Genuine sandbox payments remain real provider records even when originated during a demo. Immutable original day/run attribution survives provider latency and reset without reacting in a newer run.
 
-## Ownership
+## Notifications
 
-- Data and server logic (`convex/`): the Build crew. The schema is the shared contract; announce changes to it.
-- The tree and the visual system (`src/components/Tree.tsx`, theme, fonts, motion): the Design crew.
-- Screens (`src/app/`): Build wires data; Design styles. Keep PRs small and merge often to avoid conflicts.
+- At most one opt-in reminder per user/ritual date across trees, after a real bloom when giving is at risk: **“Today's tree has bloomed. Water it to keep your N-day streak.”** None without a streak, after giving today or for synthetic demo activity.
+- `notificationPreferences` stores consent/permission/token state; `notificationOutbox` stores deduplicated dispatch facts, never streak counters. Recheck real giving, current date, membership, current bloomed source and current preferences immediately before a persisted dispatch claim.
+- Late real settlement or safe backfill that discovers current risk re-evaluates only the payer's **current real bloomed membership days**, not the historical target day. Never reopen accepted, handed-off or unknown rows.
+- Unknown external acceptance is terminal. Only known explicit rejection may be bounded-retried after recheck. Payment after an accepted external dispatch cannot atomically cancel that alert. Provider acceptance/receipt is not proof of OS display.
+- Keep push disabled until genuine project/APNs/FCM provisioning and a supported physical-device test. Revyl simulator UX or an in-app toast is not remote iPhone notification proof.
+
+## The tree and ownership
+
+- `design/tree.html` remains the visual reference: time-of-day world, canvas tree, blossoms, fairy-light notes and answer landing. Newsreader is voice; IBM Plex Mono is metadata. Preserve the palette instead of using system light/dark mode.
+- Existing Tree props remain `timeOfDay` 0..1 (06:00–21:00), `answers`, `mine`, `notes`, `lanterns`, `onTapBlossom(index)`. Agreed optional additions are `fruits?:readonly {id:string;golden:boolean;mine?:boolean}[]` and `wateringEvent?:{id:string;fruitId:string;fruitIds?:readonly string[];revision:number}|null`. Map backend fruitId/isMine to renderer id/mine. Change props only with both sides agreeing.
+- Design owns Tree, theme, fonts and motion; Build owns data/server and screen wiring, Design styles screens. One core owner owns schema/crons/payment lifecycle. Announce shared contracts through Captains; do not overwrite the preview debugger's bridge/bundle or Design rendering.
+- Actual public embedded/sandboxed preview growth and final native fruit behavior require their own QA; backend tests or top-level Chromium are not visual acceptance.
+- Keep small PRs, never push closed/merged branches, never merge without explicit approval for that PR. Coordinate every codegen/deployment slot and get independent exact-head review before reporting verified. Clearly separate simulated, actual provider, native and physical-device evidence.
 
 ## Checks
 
