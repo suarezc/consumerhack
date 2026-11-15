@@ -82,22 +82,39 @@ async function context(ctx: QueryCtx | MutationCtx, dayId: Id<"days">, deviceId:
   return { eligible, preference, giving };
 }
 
+async function queueUserNotification(ctx: MutationCtx, day: Doc<"days">, deviceId: string) {
+  const existing = await ctx.db.query("notificationOutbox").withIndex("by_device_date", q =>
+    q.eq("deviceId", deviceId).eq("date", day.date)).unique();
+  if (existing) return;
+  const candidate = await context(ctx, day._id, deviceId);
+  if (!candidate?.eligible) return;
+  const now = Date.now();
+  const outboxId = await ctx.db.insert("notificationOutbox", {
+    deviceId, date: day.date, dayId: day._id, state: "queued",
+    attempt: 0, createdAt: now, updatedAt: now,
+  });
+  await ctx.scheduler.runAfter(0, internal.notifications.dispatch, { outboxId });
+}
+
 export async function queueBloomNotifications(ctx: MutationCtx, day: Doc<"days">) {
   if (!configured() || day.isDemo || day.bloomedAt === undefined) return;
   const members = await ctx.db.query("members").withIndex("by_tree", q => q.eq("treeId", day.treeId)).collect();
   for (const member of members) {
+    if (!member.isDemo) await queueUserNotification(ctx, day, member.deviceId);
+  }
+}
+
+export async function queuePaidUserNotifications(ctx: MutationCtx, deviceId: string) {
+  if (!configured()) return;
+  deviceIdentity(deviceId);
+  const { dayKey, giving } = await notificationGivingContext(ctx, deviceId, Date.now());
+  if (!giving.atRisk || giving.count <= 0) return;
+  const memberships = await ctx.db.query("members").withIndex("by_device", q => q.eq("deviceId", deviceId)).collect();
+  for (const member of memberships) {
     if (member.isDemo) continue;
-    const existing = await ctx.db.query("notificationOutbox").withIndex("by_device_date", q =>
-      q.eq("deviceId", member.deviceId).eq("date", day.date)).unique();
-    if (existing) continue;
-    const candidate = await context(ctx, day._id, member.deviceId);
-    if (!candidate?.eligible) continue;
-    const now = Date.now();
-    const outboxId = await ctx.db.insert("notificationOutbox", {
-      deviceId: member.deviceId, date: day.date, dayId: day._id, state: "queued",
-      attempt: 0, createdAt: now, updatedAt: now,
-    });
-    await ctx.scheduler.runAfter(0, internal.notifications.dispatch, { outboxId });
+    const day = await ctx.db.query("days").withIndex("by_tree_date", q =>
+      q.eq("treeId", member.treeId).eq("date", dayKey)).filter(q => q.neq(q.field("isDemo"), true)).first();
+    if (day?.bloomedAt !== undefined) await queueUserNotification(ctx, day, deviceId);
   }
 }
 
