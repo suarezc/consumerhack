@@ -179,6 +179,67 @@ describe("native timeline synchronization", () => {
     expect(await clearing).toBe("cleared");
     expect(transport.updateTimeline).not.toHaveBeenCalled();
   });
+  it("finishes neutral clearing and a new scope publish before stalled artwork is released", async () => {
+    let release!: () => void;
+    let started!: () => void;
+    const stalled = new Promise<void>((resolve) => { release = resolve; });
+    const preparing = new Promise<void>((resolve) => { started = resolve; });
+    let preparations = 0;
+    let displayed: number | null = null;
+    const transport = {
+      updateTimeline: (entries: WidgetEntry[]) => { displayed = entries[0].props.count; },
+      updateSnapshot: (props: { count: number | null }) => { displayed = props.count; },
+    };
+    const sync = createWidgetSync({ load: async () => transport, rootUrl: url, now: () => at("08:00:00"),
+      prepare: async (entries) => {
+        if (++preparations === 2) { started(); await stalled; }
+        return entries;
+      } });
+    const bounded = (result: Promise<unknown>) => Promise.race([
+      result, new Promise<"blocked">((resolve) => setTimeout(() => resolve("blocked"), 250)),
+    ]);
+    await sync.publish(snapshot({ giving: { count: 3, status: "current" } }));
+    expect(displayed).toBe(3);
+    const publishing = sync.publish(snapshot({ asOf: at("07:00:00"), giving: { count: 4, status: "current" } }));
+    await preparing;
+    try {
+      expect(await bounded(sync.clear())).toBe("cleared");
+      expect(displayed).toBeNull();
+      expect(await bounded(sync.publish(snapshot({ giving: { count: 6, status: "current" } })))).toBe("updated");
+      expect(displayed).toBe(6);
+    } finally {
+      release();
+      expect(await publishing).toBe("ignored");
+    }
+    expect(displayed).toBe(6);
+  });
+  it("ignores a superseded delayed clear instead of erasing a newer scope", async () => {
+    let release!: () => void;
+    let started!: () => void;
+    const loading = new Promise<void>((resolve) => { started = resolve; });
+    let displayed: number | null = 3;
+    const transport = {
+      updateTimeline: (entries: WidgetEntry[]) => { displayed = entries[0].props.count; },
+      updateSnapshot: (props: { count: number | null }) => { displayed = props.count; },
+    };
+    const load = vi.fn(async () => transport).mockImplementationOnce(async () => {
+      started();
+      await new Promise<void>((resolve) => { release = resolve; });
+      return transport;
+    });
+    const sync = createWidgetSync({ load, rootUrl: url, now: () => at("08:00:00"), prepare: async (entries) => entries });
+    const oldClear = sync.clear();
+    await loading;
+    try {
+      expect(await sync.clear()).toBe("cleared");
+      expect(displayed).toBeNull();
+      expect(await sync.publish(snapshot({ giving: { count: 6, status: "current" } }))).toBe("updated");
+    } finally {
+      release();
+      expect(await oldClear).toBe("ignored");
+    }
+    expect(displayed).toBe(6);
+  });
   it("handles absent/denied native capability without crashing or logging data", async () => {
     for (const load of [async () => null, async () => { throw new Error("denied"); }]) {
       const sync = createWidgetSync({ load, prepare: async (entries) => entries, rootUrl: url });

@@ -24,24 +24,29 @@ export function createWidgetSync(options: {
     return next;
   };
 
+  function clear(): Promise<WidgetSyncResult> {
+    const requestedGeneration = ++generation;
+    latestAsOf = -1;
+    lastFingerprint = "";
+    const clearing = (async (): Promise<WidgetSyncResult> => {
+      try {
+        const transport = await options.load();
+        if (requestedGeneration !== generation) return "ignored";
+        if (!transport) return "unavailable";
+        transport.updateSnapshot(emptyWidget(options.rootUrl));
+        return "cleared";
+      } catch {
+        return "unavailable";
+      }
+    })();
+    queue = clearing;
+    return clearing;
+  }
+
   return {
-    clear(): Promise<WidgetSyncResult> {
-      generation += 1;
-      latestAsOf = -1;
-      lastFingerprint = "";
-      return enqueue(async () => {
-        try {
-          const transport = await options.load();
-          if (!transport) return "unavailable";
-          transport.updateSnapshot(emptyWidget(options.rootUrl));
-          return "cleared";
-        } catch {
-          return "unavailable";
-        }
-      });
-    },
+    clear,
     publish(value: WidgetSnapshot | null): Promise<WidgetSyncResult> {
-      if (!isWidgetSnapshot(value)) return this.clear();
+      if (!isWidgetSnapshot(value)) return clear();
       const snapshot = { ...value, giving: { ...value.giving } };
       const requestedGeneration = generation;
       return enqueue(async () => {
