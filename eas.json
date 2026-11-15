@@ -1,0 +1,22 @@
+{
+  "cli": {
+    "version": ">= 27.10.0",
+    "requireCommit": true,
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "internal-testflight": {
+      "distribution": "store",
+      "environment": "preview",
+      "autoIncrement": true,
+      "ios": {
+        "simulator": false
+      }
+    }
+  },
+  "submit": {
+    "internal-testflight": {
+      "ios": {}
+    }
+  }
+}
