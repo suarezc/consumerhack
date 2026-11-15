@@ -1,10 +1,12 @@
 import { useMutation } from "convex/react";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { View } from "react-native";
 
 import { Panel, Scene, sceneStyles } from "@/components/screens/Scene";
+import { getTreeDataStatus } from "@/components/Tree";
+import { FruitDetailStatus } from "@/components/screens/FruitDetailStatus";
 import { DemoPanel } from "@/components/screens/DemoPanel";
 import { LoadingDay, TreeNavigation } from "@/components/screens/Screen";
 import { WateringComposer } from "@/components/screens/WateringComposer";
@@ -47,6 +49,8 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
   const selected = unlocked ? today.answers.find((answer) => answer.blossom === selectedIndex) ?? null : null;
   const canAnswer = !today.myAnswer && today.day.bloomedAt === undefined && now >= today.day.opensAt && now < today.day.bloomAt;
   const notes = today.notes.map((item) => ({ from: item.fromBlossom, to: item.toBlossom, count: 1, own: item.fromMemberId === today.member.memberId }));
+  const fruits = useMemo(() => today.fruits.map((fruit) => ({ id: fruit.fruitId, golden: fruit.golden, mine: fruit.isMine })), [today.fruits]);
+  const fruitStatus = useMemo(() => getTreeDataStatus({ fruits, wateringEvent: today.wateringEvent }), [fruits, today.wateringEvent]);
 
   async function run(action: () => Promise<unknown>, after?: () => void) {
     if (pending.current) return;
@@ -76,14 +80,16 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
   const detail = unlocked ? `${today.answerCount} ${today.answerCount === 1 ? "blossom" : "blossoms"} · tap one to read` : `${today.answerCount} of ${today.memberCount} answered${today.day.isDemo ? "" : ` · bloom ${bloomLabel(today.day.bloomAt)} local time`}`;
   return <Scene timeOfDay={timeOfDay} title={today.day.question}
     treeKey={`${today.tree.treeId}:${today.day.dayId}`}
+    treeUnavailable={fruitStatus.status === "unavailable"}
     meta={`${bloom ? "Bloom" : "StoryTime"} · ${today.tree.name}${today.day.isDemo ? " · sample day" : ""}`} detail={detail}
     onOpenTree={() => { setError(""); setSettings(true); }}
     underQuestion={<View style={sceneStyles.stack}>
       <TodayCharitySummary charity={today.charity} totalRaisedCents={today.totalRaisedCents} isDemo={today.day.isDemo} onShowDetails={() => { setError(""); setCharityOpen(true); }} />
       <TodayStreaks compact summary={today.streaks} color={theme.text} />
+      <FruitDetailStatus status={fruitStatus} fruitCount={today.fruits.length} color={theme.text} />
     </View>}
-    tree={{ answers: today.answerCount, mine: today.myAnswer ? [today.myAnswer.blossom] : [], notes, lanterns: 0, onTapBlossom: choose,
-      fruits: today.fruits.map((fruit) => ({ id: fruit.fruitId, golden: fruit.golden, mine: fruit.isMine })), wateringEvent: watering.treeEvent }}
+    tree={fruitStatus.status === "ready" ? { answers: today.answerCount, mine: today.myAnswer ? [today.myAnswer.blossom] : [], notes, lanterns: 0, onTapBlossom: choose,
+      fruits, wateringEvent: watering.treeEvent } : undefined}
     overlay={(controlsHeight) => (
     <AnswerCard controlsHeight={controlsHeight} open={selected !== null} answer={selected && { id: selected.answerId, text: selected.text, author: selected.name, isMine: selected.memberId === today.member.memberId }}
       onClose={() => { if (!busy) { setSelectedIndex(null); setNoteComposer(false); setError(""); } }}

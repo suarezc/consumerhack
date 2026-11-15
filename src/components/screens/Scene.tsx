@@ -12,17 +12,18 @@ type SceneProps = {
   detail?: string;
   tree?: Partial<Pick<TreeProps, "answers" | "mine" | "notes" | "lanterns" | "onTapBlossom" | "fruits" | "wateringEvent">>;
   treeKey?: string;
+  treeUnavailable?: boolean;
   children?: ReactNode;
   overlay?: (controlsHeight: number) => ReactNode;
   onOpenTree?: () => void;
   underQuestion?: ReactNode;
 };
 
-export function Scene({ timeOfDay, title, meta, detail, tree, treeKey, children, overlay, onOpenTree, underQuestion }: SceneProps) {
+export function Scene({ timeOfDay, title, meta, detail, tree, treeKey, treeUnavailable, children, overlay, onOpenTree, underQuestion }: SceneProps) {
   return <>
     <StatusBar style={timeOfDay > 0.75 ? "light" : "dark"} />
     <ProductScene title={title} meta={meta} detail={detail} onOpenTree={onOpenTree} underQuestion={underQuestion} overlay={overlay} tree={
-      <Tree key={treeKey} timeOfDay={timeOfDay} answers={tree?.answers ?? 0} mine={tree?.mine ?? []}
+      treeUnavailable ? null : <Tree key={treeKey} timeOfDay={timeOfDay} answers={tree?.answers ?? 0} mine={tree?.mine ?? []}
       notes={tree?.notes ?? []} lanterns={tree?.lanterns ?? 0} onTapBlossom={tree?.onTapBlossom}
       fruits={tree?.fruits ?? []} wateringEvent={tree?.wateringEvent ?? null}
       style={StyleSheet.absoluteFill} />
