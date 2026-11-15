@@ -36,20 +36,20 @@ export const kindred = query({
 });
 
 export const prepareDemo = internalMutation({
-  args: { dayId: v.id("days"), secrets: v.array(v.string()) },
-  handler: async (ctx, { dayId, secrets }) => {
+  args: { dayId: v.id("days") },
+  handler: async (ctx, { dayId }) => {
     const day = await ctx.db.get(dayId);
     if (!day || !day.isDemo || !currentBloom(day, await ctx.db.get(day.treeId))) return;
-    if (secrets.length !== 3 || secrets.some((secret) => secret.length < 32)) throw new Error("Invalid fixture setup");
     for (const [index, fixture] of demoKindred.entries()) {
       const code = fixtureCode(dayId, index);
       const existing = await ctx.db.query("trees").withIndex("by_code", (q) => q.eq("code", code)).unique();
       if (existing) continue;
+      const deviceId = `$demo:${code}`;
       const treeId = await ctx.db.insert("trees", {
-        name: fixture.treeName, code, hostDeviceId: secrets[index], createdAt: day.opensAt,
+        name: fixture.treeName, code, hostDeviceId: deviceId, createdAt: day.opensAt,
       });
       const memberId = await ctx.db.insert("members", {
-        treeId, deviceId: secrets[index], name: "A kindred voice", joinedAt: day.opensAt, isDemo: true,
+        treeId, deviceId, name: "A kindred voice", joinedAt: day.opensAt, isDemo: true,
       });
       const fixtureDayId = await ctx.db.insert("days", {
         treeId, date: day.date, question: day.question, opensAt: day.opensAt,
@@ -139,9 +139,7 @@ export const run = internalAction({
   args: { dayId: v.id("days"), attempt: v.optional(v.number()) },
   handler: async (ctx, { dayId, attempt = 0 }): Promise<void> => {
     try {
-      await ctx.runMutation(internal.judges.prepareDemo, {
-        dayId, secrets: demoKindred.map(() => crypto.randomUUID() + crypto.randomUUID()),
-      });
+      await ctx.runMutation(internal.judges.prepareDemo, { dayId });
       const data = await ctx.runQuery(internal.judges.snapshot, { dayId });
       if (!data) return;
       const answers = [...data.sources, ...data.candidates];
