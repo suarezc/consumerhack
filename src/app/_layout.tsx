@@ -16,13 +16,13 @@ export default function RootLayout() {
   return (
     <ConvexProvider client={convex}>
       <SessionProvider>
-        <NotificationProvider>
-          <DataBoundary fallback={(retry) => <DataFailure retry={retry} />}>
+        <DataBoundary fallback={(retry) => <DataFailure retry={retry} />}>
+          <NotificationProvider>
             <RitualProvider>
               <Stack screenOptions={{ headerShown: false }} />
             </RitualProvider>
-          </DataBoundary>
-        </NotificationProvider>
+          </NotificationProvider>
+        </DataBoundary>
       </SessionProvider>
     </ConvexProvider>
   );

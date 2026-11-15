@@ -14,6 +14,7 @@ const harness = vi.hoisted(() => ({
   appState: vi.fn(() => ({ remove: vi.fn() })),
   query: vi.fn(),
   mutation: vi.fn(),
+  membershipError: null as Error | null,
 }));
 
 vi.mock("react", async (original) => ({
@@ -35,7 +36,10 @@ vi.mock("react", async (original) => ({
 }));
 vi.mock("convex/react", () => {
   const client = { query: harness.query, mutation: harness.mutation };
-  return { useConvex: () => client, useQuery: () => harness.memberships };
+  return { useConvex: () => client, useQuery: () => {
+    if (harness.membershipError) throw harness.membershipError;
+    return harness.memberships;
+  } };
 });
 vi.mock("react-native", () => ({ AppState: { addEventListener: harness.appState } }));
 vi.mock("@/providers/SessionProvider", () => ({ useSession: () => ({ session: harness.session }) }));
@@ -70,6 +74,7 @@ beforeEach(() => {
   harness.setters = [];
   harness.dependencies = undefined;
   harness.cleanup = undefined;
+  harness.membershipError = null;
   harness.query.mockResolvedValue(preference);
   harness.mutation.mockResolvedValue({ ...preference, revision: 1 });
 });
@@ -115,4 +120,11 @@ it("preserves real synchronization failures after membership is confirmed", asyn
   expect(harness.setters[0]).toHaveBeenLastCalledWith({ deviceId: "anonymous-device", status: { state: "sync_failed", optIn: false } });
   expect(harness.setters[1]).toHaveBeenCalledWith({ deviceId: "anonymous-device", busy: true, action: "out" });
   expect(harness.setters[1]).toHaveBeenLastCalledWith({ deviceId: "anonymous-device", busy: false, action: "out" });
+});
+
+it("lets a membership query failure reach the enclosing retry boundary", () => {
+  harness.membershipError = new Error("Membership query failed");
+  expect(() => render()).toThrow(harness.membershipError);
+  expect(harness.mutation).not.toHaveBeenCalled();
+  expect(harness.foreground).not.toHaveBeenCalled();
 });
