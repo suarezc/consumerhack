@@ -38,7 +38,8 @@ const fruitRuntime = readFileSync(
 const html = readFileSync(new URL("./html.ts", import.meta.url), "utf8")
   .replace("${FRUIT_RUNTIME}", fruitRuntime)
   .replaceAll("${TREE_MAX_STATE_LENGTH}", String(limits.TREE_MAX_STATE_LENGTH))
-  .replaceAll("${TREE_MAX_FRUITS}", String(limits.TREE_MAX_FRUITS));
+  .replaceAll("${TREE_MAX_FRUITS}", String(limits.TREE_MAX_FRUITS))
+  .replaceAll("${TREE_MAX_EVENT_FRUITS}", String(limits.TREE_MAX_EVENT_FRUITS));
 
 function renderer(reducedMotion = true) {
   const messages = [];
@@ -184,7 +185,7 @@ test("the complete escaped-ID capacity applies atomically and overflow recovers"
   ];
   const paid = Array.from({ length: limits.TREE_MAX_FRUITS }, (_, i) => ({
     id:
-      "\u0000".repeat(252) +
+      "\u0000".repeat(limits.TREE_MAX_ID_LENGTH - 4) +
       [0, 4, 8, 12]
         .map((shift) => String.fromCharCode(alphabet[(i >>> shift) & 15]))
         .join(""),
@@ -204,15 +205,15 @@ test("the complete escaped-ID capacity applies atomically and overflow recovers"
     lanterns: 64,
     fruits: paid,
     wateringEvent: {
-      id: "\u0000".repeat(256),
+      id: "\u0000".repeat(limits.TREE_MAX_ID_LENGTH),
       fruitId: paid[0].id,
-      fruitIds: paid.map((x) => x.id),
+      fruitIds: paid.slice(0, limits.TREE_MAX_EVENT_FRUITS).map((x) => x.id),
       revision: 1,
     },
   };
   const data = serializeTreeState(props, update.session, 1, true, true);
   assert.equal(typeof data, "string");
-  assert.ok(data.length > 30000000);
+  assert.ok(data.length > 100000);
   assert.ok(data.length <= limits.TREE_MAX_STATE_LENGTH);
   const applied = update.receive(data);
   assert.equal(applied.revision, 1);
@@ -281,7 +282,10 @@ test("the complete escaped-ID capacity applies atomically and overflow recovers"
     wateringEvent: {
       id: "overflow",
       fruitId: "x",
-      fruitIds: Array.from({ length: limits.TREE_MAX_FRUITS + 1 }, () => "x"),
+      fruitIds: Array.from(
+        { length: limits.TREE_MAX_EVENT_FRUITS + 1 },
+        () => "x",
+      ),
       revision: 1,
     },
   });

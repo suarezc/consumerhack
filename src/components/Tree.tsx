@@ -1,14 +1,26 @@
-import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { AccessibilityInfo, AppState, StyleSheet, View } from "react-native";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 
 import {
-  normalizeTreeState,
+  normalizeAnswerCount,
+  createTreeStateSerializer,
+  getTreeDataStatus,
   readTreeMessage,
-  serializeTreeState,
 } from "./tree/bridge";
 import { TREE_HTML } from "./tree/html";
+import { TreeDataError } from "./tree/TreeDataError";
 import type { TreeProps } from "./tree/types";
+
+export { getTreeDataStatus } from "./tree/bridge";
+export type { TreeDataStatus } from "./tree/bridge";
+export { TREE_MAX_FRUITS } from "./tree/limits";
 
 export type {
   TreeFruit,
@@ -28,13 +40,17 @@ export function Tree(props: TreeProps) {
   const session = useRef<string | null>(null);
   const revision = useRef(0);
   const allowTaps = useRef(false);
+  const [unavailable, setUnavailable] = useState<
+    "capacity" | "invalid-data" | null
+  >(null);
+  const serializer = useRef(createTreeStateSerializer());
   const active = useRef(AppState.currentState === "active");
   const reduceMotion = useRef(false);
 
   const synchronize = useCallback(() => {
     if (!session.current) return;
     const nextRevision = revision.current + 1;
-    const data = serializeTreeState(
+    const data = serializer.current(
       latest.current,
       session.current,
       nextRevision,
@@ -43,14 +59,28 @@ export function Tree(props: TreeProps) {
     );
     if (data === null) {
       allowTaps.current = false;
+      const status = getTreeDataStatus(latest.current);
+      setUnavailable(
+        status.status === "unavailable" ? status.reason : "invalid-data",
+      );
       console.warn(
         "Tree snapshot exceeds supported transport limits; no fruits were truncated.",
       );
       return;
     }
+    const target = webView.current;
+    try {
+      if (!target) throw new Error("Tree transport unavailable");
+      target.postMessage(data);
+    } catch {
+      serializer.current.reset();
+      allowTaps.current = false;
+      setUnavailable("invalid-data");
+      return;
+    }
     revision.current = nextRevision;
+    setUnavailable(null);
     allowTaps.current = true;
-    webView.current?.postMessage(data);
   }, []);
 
   useEffect(synchronize, [
@@ -99,6 +129,7 @@ export function Tree(props: TreeProps) {
       const message = readTreeMessage(event.nativeEvent.data);
       if (!message) return;
       if (message.type === "ready") {
+        serializer.current.reset();
         session.current = message.session;
         synchronize();
         return;
@@ -109,7 +140,7 @@ export function Tree(props: TreeProps) {
         message.revision !== revision.current
       )
         return;
-      if (message.index >= normalizeTreeState(latest.current).answers) return;
+      if (message.index >= normalizeAnswerCount(latest.current.answers)) return;
       latest.current.onTapBlossom?.(message.index);
     },
     [synchronize],
@@ -120,6 +151,8 @@ export function Tree(props: TreeProps) {
       <WebView<object>
         ref={webView}
         source={source}
+        accessibilityElementsHidden={Boolean(unavailable)}
+        importantForAccessibility={unavailable ? "no-hide-descendants" : "auto"}
         style={styles.webView}
         originWhitelist={["*"]}
         onShouldStartLoadWithRequest={(request) =>
@@ -127,6 +160,7 @@ export function Tree(props: TreeProps) {
         }
         onLoadStart={() => {
           session.current = null;
+          serializer.current.reset();
           allowTaps.current = false;
         }}
         onMessage={onMessage}
@@ -142,6 +176,7 @@ export function Tree(props: TreeProps) {
         allowFileAccess={false}
         mixedContentMode="never"
       />
+      {unavailable && <TreeDataError reason={unavailable} />}
     </View>
   );
 }

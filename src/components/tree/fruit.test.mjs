@@ -23,7 +23,12 @@ const runtime = readFileSync(
 const { createWateringTracker, createFruitLayer } = vm.runInNewContext(
   runtime + "\n({createWateringTracker,createFruitLayer});",
 );
-const { normalizeTreeState } = load("bridge", {
+const {
+  normalizeTreeState,
+  getTreeDataStatus,
+  serializeTreeState,
+  createTreeStateSerializer,
+} = load("bridge", {
   "./fruit": fruit,
   "./limits": limits,
 });
@@ -32,6 +37,110 @@ const fruits = Object.freeze([
   Object.freeze({ id: "ledger-a", golden: false, mine: true }),
   Object.freeze({ id: "ledger-b", golden: true }),
 ]);
+
+test("preflight rejects excessive raw arrays before reading records and invalid IDs before normalization", () => {
+  const props = { timeOfDay: 1, answers: 40, mine: [], notes: [], lanterns: 0 };
+  const tooMany = new Proxy(Array(limits.TREE_MAX_FRUITS + 1), {
+    get(target, key) {
+      if (key !== "length") throw new Error("raw records must not be read");
+      return target.length;
+    },
+  });
+  assert.equal(getTreeDataStatus({ fruits: tooMany }).reason, "capacity");
+  assert.equal(getTreeDataStatus({ fruits: Array(1) }).reason, "invalid-data");
+  assert.equal(
+    serializeTreeState(
+      { ...props, fruits: tooMany },
+      "session",
+      1,
+      true,
+      false,
+    ),
+    null,
+  );
+  const bad = {
+    id: "x".repeat(129),
+    get golden() {
+      throw new Error("invalid ID must stop before flags or hashing");
+    },
+  };
+  assert.equal(getTreeDataStatus({ fruits: [bad] }).reason, "invalid-data");
+  assert.equal(
+    serializeTreeState({ ...props, fruits: [bad] }, "session", 1, true, false),
+    null,
+  );
+  assert.equal(
+    getTreeDataStatus({ fruits: [{ id: "not-ascii-é", golden: false }] })
+      .reason,
+    "invalid-data",
+  );
+});
+
+test("clock snapshots omit unchanged cloned collections, while changes, empty clears and new sessions are complete", () => {
+  const serialize = createTreeStateSerializer();
+  const event = {
+    id: "fixture-event",
+    fruitId: "ledger-a",
+    fruitIds: ["ledger-a", "ledger-b"],
+    revision: 1,
+  };
+  const props = {
+    timeOfDay: 1,
+    answers: 40,
+    mine: [],
+    notes: [],
+    lanterns: 0,
+    fruits,
+    wateringEvent: event,
+  };
+  const first = JSON.parse(serialize(props, "session", 1, true, false));
+  assert.equal(first.fruits.length, 2);
+  const tick = JSON.parse(
+    serialize(
+      {
+        ...props,
+        timeOfDay: 0.9,
+        fruits: fruits.map((f) => ({ ...f })),
+        wateringEvent: { ...event, fruitIds: [...event.fruitIds] },
+      },
+      "session",
+      2,
+      true,
+      false,
+    ),
+  );
+  assert.equal("fruits" in tick, false);
+  assert.equal("wateringEvent" in tick, false);
+  const changed = JSON.parse(
+    serialize(
+      {
+        ...props,
+        fruits: fruits.map((f) => ({ ...f, golden: false })),
+        wateringEvent: { ...event, revision: 2 },
+      },
+      "session",
+      3,
+      true,
+      false,
+    ),
+  );
+  assert.equal(changed.fruits.length, 2);
+  assert.equal(changed.wateringEvent.revision, 2);
+  const cleared = JSON.parse(
+    serialize(
+      { ...props, fruits: [], wateringEvent: null },
+      "session",
+      4,
+      true,
+      false,
+    ),
+  );
+  assert.deepEqual(cleared.fruits, []);
+  assert.equal(cleared.wateringEvent, null);
+  const fresh = JSON.parse(serialize(props, "new-session", 5, true, false));
+  assert.equal(fresh.fruits.length, 2);
+  assert.deepEqual(fresh.wateringEvent, event);
+});
 
 test("fruit transport is additive and leaves legacy props and caller arrays unchanged", () => {
   const legacy = {
@@ -282,7 +391,22 @@ test("a confirmed watering pulses roots without changing an ungrown tree", () =>
   assert.equal(JSON.stringify(scene), before);
 });
 
-for (const count of [2, 3, 5, 10]) {
+test("omitted clock collections retain fruit/event state, and explicit empty arrays clear it", () => {
+  const layer = createFruitLayer();
+  layer.update(
+    payload(fruits),
+    { id: "baseline", fruitId: "ledger-a", revision: 1 },
+    0,
+    false,
+  );
+  const before = draw(layer, 0.4);
+  layer.update(undefined, undefined, 1, false);
+  assert.deepEqual(draw(layer, 1.4), before);
+  layer.update([], null, 2, false);
+  assert.equal(draw(layer, 2.4).filter((x) => x.op === "fill").length, 0);
+});
+
+for (const count of [2, 3, 5, 10, 200]) {
   test(`${count} paid bundle fruits get one payment flourish and all arrive`, () => {
     const paid = Array.from({ length: count }, (_, i) => ({
       id: `fixture-payment-${count}:${i}`,

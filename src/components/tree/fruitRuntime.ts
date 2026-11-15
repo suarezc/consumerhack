@@ -5,7 +5,10 @@ function createWateringTracker() {
   return {
     observe(value, fruits) {
       const validId = (id) =>
-        typeof id === "string" && id.length > 0 && id.length <= 256;
+        typeof id === "string" &&
+        id.length > 0 &&
+        id.length <= 128 &&
+        /^[\x00-\x7f]+$/.test(id);
       const event =
         value &&
         validId(value.id) &&
@@ -30,13 +33,9 @@ function createWateringTracker() {
         if (event) consumed.add(event.id);
         return null;
       }
-      if (
-        !event ||
-        consumed.has(event.id) ||
-        !(event.fruitIds ?? [event.fruitId]).every((id) =>
-          fruits.some((fruit) => fruit.id === id),
-        )
-      )
+      if (!event || consumed.has(event.id)) return null;
+      const available = new Set(fruits.map((fruit) => fruit.id));
+      if (!(event.fruitIds ?? [event.fruitId]).every((id) => available.has(id)))
         return null;
       consumed.add(event.id);
       return event;
@@ -46,7 +45,9 @@ function createWateringTracker() {
 
 function createFruitLayer() {
   let fruits = [],
-    effects = [];
+    effects = [],
+    currentEvent = null;
+  let fruitById = new Map();
   const tracker = createWateringTracker();
   const ease = (value) => {
     const v = Math.max(0, Math.min(1, value));
@@ -65,14 +66,16 @@ function createFruitLayer() {
   }
   return {
     update(value, event, now, reduced) {
-      const ids = new Set();
-      fruits = (Array.isArray(value) ? value : [])
-        .filter((fruit) => {
+      if (event !== undefined) currentEvent = event;
+      if (value !== undefined) {
+        const ids = new Set();
+        fruits = (Array.isArray(value) ? value : []).filter((fruit) => {
           if (
             !fruit ||
             typeof fruit.id !== "string" ||
             !fruit.id.length ||
-            fruit.id.length > 256 ||
+            fruit.id.length > 128 ||
+            !/^[\x00-\x7f]+$/.test(fruit.id) ||
             ids.has(fruit.id) ||
             typeof fruit.golden !== "boolean"
           )
@@ -92,13 +95,18 @@ function createFruitLayer() {
           ids.add(fruit.id);
           return true;
         });
-      const eligible = tracker.observe(event, fruits);
+        fruitById = new Map(fruits.map((fruit) => [fruit.id, fruit]));
+      }
+      const eligible = tracker.observe(currentEvent, fruits);
       effects = effects.filter((effect) =>
-        effect.fruitIds.some((id) => fruits.some((fruit) => fruit.id === id)),
+        effect.fruitIds.some((id) => fruitById.has(id)),
       );
       if (reduced) effects = [];
       else if (eligible)
-        effects.push({ fruitIds: eligible.fruitIds ?? [eligible.fruitId], t0: now });
+        effects.push({
+          fruitIds: eligible.fruitIds ?? [eligible.fruitId],
+          t0: now,
+        });
       if (effects.length > 6) effects.splice(0, effects.length - 6);
     },
     draw(ctx, geometry, now, reduced) {
@@ -107,16 +115,15 @@ function createFruitLayer() {
       effects = effects.filter((effect) => now - effect.t0 < 1.8);
       const unit = geometry.unit,
         radius = Math.max(4, unit * 0.047);
+      const arriving = new Set();
+      effects.forEach((effect) => {
+        if (now - effect.t0 < 1.65)
+          effect.fruitIds.forEach((id) => arriving.add(id));
+      });
       ctx.save();
       for (const fruit of fruits) {
         const point = target(fruit, geometry);
-        if (
-          !point ||
-          effects.some(
-            (effect) => effect.fruitIds.includes(fruit.id) && now - effect.t0 < 1.65,
-          )
-        )
-          continue;
+        if (!point || arriving.has(fruit.id)) continue;
         const { x, y } = point;
         ctx.strokeStyle = "#8da585";
         ctx.lineWidth = Math.max(0.8, radius * 0.16);
@@ -179,7 +186,7 @@ function createFruitLayer() {
       for (const effect of effects) {
         const age = Math.max(0, now - effect.t0);
         const targets = effect.fruitIds
-          .map((id) => fruits.find((fruit) => fruit.id === id))
+          .map((id) => fruitById.get(id))
           .filter(Boolean);
         if (!targets.length) continue;
         const rootX = geometry.rootX,
