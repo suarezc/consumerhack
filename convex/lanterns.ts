@@ -4,7 +4,7 @@ import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { action, internalAction, internalMutation, internalQuery } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { requireMember } from "./access";
+import { readableDay, requireMember } from "./access";
 import { matchLantern, requireSandbox, sandboxCheckoutUrl, validateAmount, verifyPayment, WHOP_API_VERSION } from "./lib/payments";
 
 const checkoutArgs = {
@@ -25,9 +25,7 @@ async function authorizeCheckout(ctx: QueryCtx | MutationCtx, args: {
     const answer = await ctx.db.get(args.answerId);
     if (!answer || answer.treeId !== args.treeId) throw new Error("Answer is not available");
     const day = await ctx.db.get(answer.dayId);
-    const mine = await ctx.db.query("answers").withIndex("by_day_member", q =>
-      q.eq("dayId", answer.dayId).eq("memberId", member._id)).unique();
-    if (!day?.bloomedAt || !mine || (day.isDemo && tree.demoDayId !== day._id)) {
+    if (!day || day.treeId !== args.treeId || !(await readableDay(ctx, day, member._id))) {
       throw new Error("Answer is not available");
     }
   }
@@ -58,7 +56,7 @@ export const recordPending = internalMutation({
     const member = await authorizeCheckout(ctx, args);
     if (member._id !== args.memberId) throw new Error("Membership changed during checkout");
     const existing = await ctx.db.query("lanterns").withIndex("by_checkout", q =>
-      q.eq("whopCheckoutId", args.checkoutId)).unique();
+      q.eq("whopCheckoutId", args.checkoutId)).first();
     if (existing) throw new Error("Checkout has already been recorded");
     return await ctx.db.insert("lanterns", {
       treeId: args.treeId,
@@ -113,7 +111,7 @@ export const applyPayment = internalMutation({
   handler: async (ctx, payment) => {
     requireSandbox(process.env.WHOP_ENVIRONMENT);
     const lantern = await ctx.db.query("lanterns").withIndex("by_checkout", q =>
-      q.eq("whopCheckoutId", payment.checkoutId)).unique();
+      q.eq("whopCheckoutId", payment.checkoutId)).first();
     if (!lantern) throw new Error("Pending lantern not found");
     if (!matchLantern(lantern, payment)) return null;
     const member = await ctx.db.get(lantern.memberId);
@@ -124,8 +122,24 @@ export const applyPayment = internalMutation({
     }
     const previous = await ctx.db.query("lanterns").filter(q =>
       q.eq(q.field("whopPaymentId"), payment.paymentId)).first();
-    if (previous) throw new Error("Payment has already been used");
-    await ctx.db.patch(lantern._id, { status: "paid", whopPaymentId: payment.paymentId });
+    if (previous) {
+      matchLantern(previous, payment);
+      return null;
+    }
+    if (lantern.status === "pending") {
+      await ctx.db.patch(lantern._id, { status: "paid", whopPaymentId: payment.paymentId });
+    } else {
+      await ctx.db.insert("lanterns", {
+        treeId: lantern.treeId,
+        ...(lantern.answerId ? { answerId: lantern.answerId } : {}),
+        memberId: lantern.memberId,
+        amountCents: lantern.amountCents,
+        status: "paid",
+        whopCheckoutId: payment.checkoutId,
+        whopPaymentId: payment.paymentId,
+        createdAt: Date.now(),
+      });
+    }
     return null;
   },
 });

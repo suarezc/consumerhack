@@ -74,6 +74,9 @@ test("verified payment uses exact decimal cents and trusted checkout metadata", 
   const result = verifyPayment(payment, event.accountId, event);
   assert.deepEqual(result, { paymentId: event.paymentId, checkoutId: "ch_test", treeId: "tree", memberId: "member", amountCents: 500 });
   assert.equal(matchLantern(lantern, result), true);
+  for (const amount of ["5", "5.0", "5.00"]) {
+    assert.equal(verifyPayment({ ...payment, subtotal: { ...money, amount }, total: { ...money, amount } }, event.accountId, event).amountCents, 500);
+  }
 });
 
 test("pending, wrong account/payment/currency/checkout, invalid totals and foreign metadata fail", () => {
@@ -88,10 +91,20 @@ test("pending, wrong account/payment/currency/checkout, invalid totals and forei
   assert.throws(() => verifyPayment(payment, "biz_other", event));
 });
 
-test("a paid lantern cannot be relit by replay or reassigned to a different payment", () => {
+test("a paid lantern ignores replay but allows a distinct payment through the reusable link", () => {
   const verified = verifyPayment(payment, event.accountId, event);
   assert.equal(matchLantern({ ...lantern, status: "paid", whopPaymentId: event.paymentId }, verified), false);
-  assert.throws(() => matchLantern({ ...lantern, status: "paid", whopPaymentId: "pay_other" }, verified));
+  assert.equal(matchLantern({ ...lantern, status: "paid", whopPaymentId: "pay_other" }, verified), true);
+});
+
+test("verified tax changes the charged total but not the cause contribution", () => {
+  const tax = { ...money, amount: "0.50" };
+  for (const [tax_behavior, total] of [["exclusive", "5.50"], ["inclusive", "5.00"]]) {
+    assert.equal(verifyPayment({ ...payment, tax_amount: tax, tax_behavior, total: { ...money, amount: total } }, event.accountId, event).amountCents, 500);
+  }
+  assert.throws(() => verifyPayment({ ...payment, tax_amount: tax, tax_behavior: "exclusive" }, event.accountId, event));
+  assert.throws(() => verifyPayment({ ...payment, tax_amount: tax, tax_behavior: "unknown" }, event.accountId, event));
+  assert.throws(() => verifyPayment({ ...payment, tax_amount: { ...tax, currency: "eur" } }, event.accountId, event));
 });
 
 test("amount, checkout, tree, member and answer bindings must all match", () => {

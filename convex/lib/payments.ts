@@ -39,12 +39,12 @@ export function paymentEvent(raw: string, headers: Record<string, string>, secre
 function usdCents(value: unknown) {
   const money = object(value);
   if (money.currency !== "usd" || money.decimals !== 2 ||
-      typeof money.amount !== "string" || !/^\d+\.\d{2}$/.test(money.amount)) {
+      typeof money.amount !== "string" || !/^\d+(\.\d{1,2})?$/.test(money.amount)) {
     throw new Error("Invalid USD payment amount");
   }
-  const [dollars, cents] = money.amount.split(".");
-  const amountCents = Number(dollars) * 100 + Number(cents);
-  validateAmount(amountCents);
+  const [dollars, cents = ""] = money.amount.split(".");
+  const amountCents = Number(dollars) * 100 + Number(cents.padEnd(2, "0"));
+  if (!Number.isSafeInteger(amountCents) || amountCents < 0) throw new Error("Invalid USD payment amount");
   return amountCents;
 }
 
@@ -68,7 +68,15 @@ export function verifyPayment(
     throw new Error("Payment has not been verified");
   }
   const amountCents = usdCents(payment.subtotal);
-  if (usdCents(payment.total) !== amountCents) throw new Error("Payment total does not match price");
+  validateAmount(amountCents);
+  const taxCents = payment.tax_amount == null ? 0 : usdCents(payment.tax_amount);
+  if (taxCents > 0 && payment.tax_behavior !== "exclusive" && payment.tax_behavior !== "inclusive") {
+    throw new Error("Payment tax behavior is not supported");
+  }
+  const expectedTotal = amountCents + (payment.tax_behavior === "exclusive" ? taxCents : 0);
+  if (usdCents(payment.total) !== expectedTotal || taxCents > amountCents) {
+    throw new Error("Payment total does not match price and tax");
+  }
   const metadata = object(payment.metadata);
   if (metadata.integration !== "storytime-lantern-sandbox" ||
       typeof metadata.treeId !== "string" || typeof metadata.memberId !== "string" ||
@@ -95,10 +103,7 @@ export function matchLantern(
       lantern.amountCents !== payment.amountCents) {
     throw new Error("Payment does not match the pending lantern");
   }
-  if (lantern.status === "paid" && lantern.whopPaymentId !== payment.paymentId) {
-    throw new Error("Checkout has already been fulfilled by another payment");
-  }
-  return lantern.status === "pending";
+  return lantern.whopPaymentId !== payment.paymentId;
 }
 
 export function sandboxCheckoutUrl(value: string | null | undefined) {
