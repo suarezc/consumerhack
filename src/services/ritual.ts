@@ -11,5 +11,5 @@ export function bloomLabel(timestamp: number) {
 export function amountInCents(value: string) {
   if (!/^\d{1,3}(\.\d{1,2})?$/.test(value.trim())) return null;
   const amount = Math.round(Number(value) * 100);
-  return amount >= 50 && amount <= 10000 && amount % 50 === 0 ? amount : null;
+  return amount >= 100 && amount <= 10000 && amount % 50 === 0 ? amount : null;
 }

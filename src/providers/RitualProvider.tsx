@@ -1,27 +1,56 @@
 import { useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { randomUUID } from "expo-crypto";
+import { createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 
 import { StoryTimeProvider } from "@/design";
 import { useSession } from "@/providers/SessionProvider";
 import { api, type Id } from "@/services/api";
 import { ritualTime } from "@/services/ritual";
+import { createWateringObserver, emptyWateringDispatch, type WateringDispatch } from "@/services/watering";
 
 export type Today = NonNullable<FunctionReturnType<typeof api.days.today>>;
-const RitualContext = createContext<{ today: Today | null | undefined; now: number; timeOfDay: number } | null>(null);
+const RitualContext = createContext<{
+  today: Today | null | undefined;
+  now: number;
+  timeOfDay: number;
+  watering: WateringDispatch;
+  consumeGivingFeedback: (id: string) => void;
+} | null>(null);
 
 export function RitualProvider({ children }: { children: ReactNode }) {
   const { session } = useSession();
   const today = useQuery(api.days.today, session?.treeId ? {
     deviceId: session.deviceId, treeId: session.treeId as Id<"trees">,
   } : "skip");
-  const [now, setNow] = useState(Date.now);
+  const [observer] = useState(() => createWateringObserver(randomUUID));
+  const dispatch = useSyncExternalStore(observer.subscribe, observer.getSnapshot, () => emptyWateringDispatch);
+  const contextId = today ? `${today.tree.treeId}:${today.day.dayId}:${today.streaks.clock.date}:${today.streaks.isDemo}` : null;
+  const watering = dispatch.contextId === contextId ? dispatch : emptyWateringDispatch;
+  const serverNow = today?.streaks.clock.now;
+  const dayId = today?.day.dayId;
+  const [tick, setTick] = useState<{ now: number; server: number | undefined; dayId: string | undefined }>(() => ({
+    now: Date.now(), server: undefined, dayId: undefined,
+  }));
   useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
+    const started = performance.now();
+    const anchor = serverNow ?? Date.now();
+    const timer = setInterval(() => setTick({
+      now: Math.floor(anchor + Math.max(0, performance.now() - started)), server: serverNow, dayId,
+    }), 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [serverNow, dayId]);
+  useEffect(() => {
+    if (!today) {
+      observer.reset();
+      return;
+    }
+    observer.observe(contextId!,
+      today.fruits.map((fruit) => fruit.fruitId), today.wateringEvent, today.streaks.giving.count, today.streaks.isDemo);
+  }, [observer, today, contextId]);
+  const now = serverNow !== undefined && (tick.server !== serverNow || tick.dayId !== dayId) ? serverNow : tick.now;
   const timeOfDay = ritualTime(now, today?.day);
-  return <RitualContext.Provider value={{ today, now, timeOfDay }}>
+  return <RitualContext.Provider value={{ today, now, timeOfDay, watering, consumeGivingFeedback: observer.consumeFeedback }}>
     <StoryTimeProvider timeOfDay={timeOfDay}>{children}</StoryTimeProvider>
   </RitualContext.Provider>;
 }

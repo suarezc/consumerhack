@@ -18,10 +18,10 @@ test("demo palette compresses one shared clock from opening to bloom", () => {
   assert.equal(ritualTime(90000, day), 1);
 });
 
-test("watering amounts use positive fifty-cent steps without raising the minimum", () => {
-  assert.equal(amountInCents("0.50"), 50);
+test("watering amounts require the approved dollar minimum and fifty-cent steps", () => {
   assert.equal(amountInCents("1"), 100);
+  assert.equal(amountInCents("1.50"), 150);
   assert.equal(amountInCents("10.50"), 1050);
   assert.equal(amountInCents("100"), 10000);
-  for (const invalid of ["0", "0.49", "0.99", "1.25", "100.01", "1.001", "1e2", "-1", "", "1abc"]) assert.equal(amountInCents(invalid), null);
+  for (const invalid of ["0", "0.49", "0.50", "0.99", "1.25", "100.01", "1.001", "1e2", "-1", "", "1abc"]) assert.equal(amountInCents(invalid), null);
 });

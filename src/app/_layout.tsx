@@ -5,6 +5,7 @@ import { Stack } from "expo-router";
 
 import { SessionProvider } from "@/providers/SessionProvider";
 import { RitualProvider } from "@/providers/RitualProvider";
+import { NotificationProvider } from "@/providers/NotificationProvider";
 import { DataBoundary, DataFailure } from "@/components/screens/Screen";
 
 const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
@@ -15,11 +16,13 @@ export default function RootLayout() {
   return (
     <ConvexProvider client={convex}>
       <SessionProvider>
+        <NotificationProvider>
           <DataBoundary fallback={(retry) => <DataFailure retry={retry} />}>
             <RitualProvider>
               <Stack screenOptions={{ headerShown: false }} />
             </RitualProvider>
           </DataBoundary>
+        </NotificationProvider>
       </SessionProvider>
     </ConvexProvider>
   );

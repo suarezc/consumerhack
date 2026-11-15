@@ -1,20 +1,57 @@
-export type WateringEvent = { id: string; fruitId: string; revision: 1 };
+export type WateringEvent = Readonly<{ id: string; fruitId: string; revision: 1 }>;
+export type GivingEvent = Readonly<{ id: string; baselineId: string; givingCount: number; isDemo: boolean }>;
+export type WateringDispatch = Readonly<{
+  contextId: string | null;
+  baselineId: string | null;
+  treeEvent: WateringEvent | null;
+  feedbackEvent: GivingEvent | null;
+}>;
 
-export function createWateringObserver() {
-  const baselines = new Set<string>();
+export const emptyWateringDispatch: WateringDispatch = Object.freeze({ contextId: null, baselineId: null, treeEvent: null, feedbackEvent: null });
+
+export function createWateringObserver(createBaselineId: () => string) {
   const consumed = new Set<string>();
+  const listeners = new Set<() => void>();
+  let context: string | null = null;
+  let snapshot = emptyWateringDispatch;
+
+  function publish(next: WateringDispatch) {
+    snapshot = Object.freeze(next);
+    for (const listener of listeners) listener();
+  }
 
   return {
-    observe(scope: string, confirmedFruitIds: readonly string[], event: WateringEvent | null): WateringEvent | null {
-      if (!baselines.has(scope)) {
+    subscribe(listener: () => void) {
+      listeners.add(listener);
+      return () => { listeners.delete(listener); };
+    },
+    getSnapshot: () => snapshot,
+    reset() {
+      context = null;
+      if (snapshot !== emptyWateringDispatch) publish(emptyWateringDispatch);
+    },
+    observe(nextContext: string, confirmedFruitIds: readonly string[], event: WateringEvent | null, givingCount: number, isDemo: boolean) {
+      if (context !== nextContext) {
         for (const id of confirmedFruitIds) consumed.add(id);
         if (event) consumed.add(event.id);
-        baselines.add(scope);
-        return null;
+        context = nextContext;
+        publish({ contextId: nextContext, baselineId: createBaselineId(), treeEvent: null, feedbackEvent: null });
+        return;
       }
-      if (!event || event.revision !== 1 || !confirmedFruitIds.includes(event.fruitId) || consumed.has(event.id)) return null;
+      if (!event || event.revision !== 1 || !confirmedFruitIds.includes(event.fruitId) || consumed.has(event.id)) return;
       consumed.add(event.id);
-      return event;
+      const baselineId = snapshot.baselineId!;
+      publish({
+        contextId: nextContext,
+        baselineId,
+        treeEvent: Object.freeze({ ...event }),
+        feedbackEvent: Number.isSafeInteger(givingCount) && givingCount >= 0
+          ? Object.freeze({ id: event.id, baselineId, givingCount, isDemo }) : null,
+      });
+    },
+    consumeFeedback(id: string) {
+      if (snapshot.feedbackEvent?.id !== id) return;
+      publish({ ...snapshot, feedbackEvent: null });
     },
   };
 }

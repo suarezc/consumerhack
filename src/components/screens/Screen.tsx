@@ -1,4 +1,5 @@
 import { router, Redirect } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { Component, useState, type ReactNode } from "react";
 import { Pressable, View } from "react-native";
 
@@ -8,7 +9,8 @@ import { useRitual } from "@/providers/RitualProvider";
 import { useSession } from "@/providers/SessionProvider";
 
 export function Screen({ title, children }: { title: string; children: ReactNode }) {
-  return <View nativeID="story-secondary-safe-area" style={{ flex: 1 }}><StoryScreen><StoryText variant="question" accessibilityRole="header">{title}</StoryText>{children}</StoryScreen></View>;
+  const { theme } = useStoryTime();
+  return <View nativeID="story-secondary-safe-area" style={{ flex: 1 }}><StatusBar style={theme.text === theme.paper ? "light" : "dark"} /><StoryScreen><StoryText variant="question" accessibilityRole="header">{title}</StoryText>{children}</StoryScreen></View>;
 }
 
 export function SessionGate({ children, requireTree = false }: { children: ReactNode; requireTree?: boolean }) {
