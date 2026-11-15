@@ -77,7 +77,8 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
     meta={`StoryTime · ${today.tree.name}${today.day.isDemo ? " · sample day" : ""}`} detail={detail}
     onOpenTree={() => { setError(""); setSettings(true); }}
     underQuestion={<View style={sceneStyles.stack}>
-      <TodayCharitySummary charity={today.charity} totalRaisedCents={today.totalRaisedCents} isDemo={today.day.isDemo} onDetails={() => setCharityOpen(true)} />
+      <TodayCharitySummary charity={today.charity} totalRaisedCents={today.totalRaisedCents} isDemo={today.day.isDemo} onDetails={() => { setError(""); setCharityOpen(true); }} />
+      <StoryText variant="caption" color={theme.ink}>{today.day.isDemo ? "Sample gross total · no real money" : "Sandbox gross total · not net charity proceeds"}</StoryText>
       <TodayStreaks summary={today.streaks} color={theme.ink} />
     </View>}
     tree={{ answers: today.answerCount, mine: today.myAnswer ? [today.myAnswer.blossom] : [], notes, lanterns: 0, onTapBlossom: choose,

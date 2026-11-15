@@ -11,7 +11,7 @@ export function bloomLabel(timestamp: number) {
 export function firstOpenView(todayDayId: string | null | undefined, intro: {
   todayDayId: string;
   shouldShowYesterday: boolean;
-  yesterday: unknown | null;
+  yesterday: object | null;
 } | null | undefined) {
   if (!todayDayId || !intro || intro.todayDayId !== todayDayId) return "loading";
   return intro.shouldShowYesterday && intro.yesterday !== null ? "yesterday" : "today";

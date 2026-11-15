@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 
 import { Tree } from "@/components/Tree";
-import { YesterdayImpact } from "@/design";
+import { StoryText, YesterdayImpact } from "@/design";
 import type { FirstOpen } from "@/providers/RitualProvider";
 import { useSession } from "@/providers/SessionProvider";
 import { api, type Id } from "@/services/api";
@@ -43,5 +43,6 @@ export function YesterdayIntro({ intro, treeId }: { intro: FirstOpen; treeId: Id
     <Tree key={yesterday.dayId} timeOfDay={1} answers={yesterday.answererCount} mine={[]} notes={[]} lanterns={0}
       fruits={yesterday.fruits.map((fruit) => ({ id: fruit.fruitId, golden: fruit.golden, mine: fruit.isMine }))}
       wateringEvent={null} style={{ height: 280 }} />
+    <StoryText variant="caption">{yesterday.isDemo ? "Sample gross total · no real money" : "Sandbox gross total · not net charity proceeds. No real donation or payout is established."}</StoryText>
   </YesterdayImpact>;
 }
