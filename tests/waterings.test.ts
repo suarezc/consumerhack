@@ -102,6 +102,39 @@ describe("computed user dates", () => {
     expect(JSON.stringify(grove)).not.toContain("Private history");
   });
 
+  it("shows another contributor's cross-tree milestone on the shared tree without private identities or notes", async () => {
+    const { t, tree } = await fixture();
+    const guest = "shared-fruit-guest-00001";
+    const privateTree = await t.mutation(api.trees.create, { deviceId: guest, name: "Private guest tree", memberName: "Guest" });
+    const joined = await t.mutation(api.trees.join, { deviceId: guest, code: tree.code, memberName: "Guest" });
+    await contribution(t, privateTree, "2026-11-13");
+    await contribution(t, privateTree, "2026-11-14");
+    await contribution(t, joined, "2026-11-15");
+    await t.run(async ctx => {
+      const answer = await ctx.db.query("answers").withIndex("by_day_member", q => q.eq("dayId", joined.dayId).eq("memberId", joined.memberId)).unique();
+      await ctx.db.insert("notes", { answerId: answer!._id, fromMemberId: joined.memberId, text: "A private note", createdAt: Date.now() });
+    });
+    const state = await t.query(api.days.today, { deviceId, treeId: tree.treeId });
+    expect(state?.fruits[0]).toMatchObject({ golden: true, milestone: 3, isMine: false });
+    expect(state?.wateringEvent).toBeNull();
+    for (const privateText of [guest, "A private note", "Private history", "memberId", "whopPaymentId"]) {
+      expect(JSON.stringify(state?.fruits)).not.toContain(privateText);
+    }
+    expect((await t.query(api.streaks.summary, { deviceId, treeId: tree.treeId })).giving).toMatchObject({ count: 0, totalCents: 0 });
+  });
+
+  it("breaks the queried streak after a full empty ritual day while preserving longest and lifetime total", async () => {
+    const { t, tree } = await fixture();
+    await contribution(t, tree, "2026-11-13");
+    await contribution(t, tree, "2026-11-14");
+    expect((await t.query(api.streaks.summary, { deviceId, treeId: tree.treeId })).giving).toMatchObject({ count: 2, status: "at_risk" });
+    vi.setSystemTime(new Date("2026-11-16T06:00:00Z"));
+    await t.mutation(internal.lifecycle.morning);
+    const state = await t.query(api.streaks.summary, { deviceId, treeId: tree.treeId });
+    expect(state.answer).toEqual({ count: 0, status: "none" });
+    expect(state.giving).toEqual({ count: 0, status: "none", longest: 2, totalCents: 200 });
+  });
+
   it("keeps both summary and Today subscribed to the next real-day insertion", async () => {
     const { t, tree } = await fixture();
     await contribution(t, tree, "2026-11-15");
