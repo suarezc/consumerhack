@@ -1,18 +1,30 @@
-import { StyleSheet, Text, View } from "react-native";
+import { Redirect } from "expo-router";
+import { useState } from "react";
+import { Button, Text, TextInput } from "react-native";
 
-import { Tree } from "@/components/Tree";
+import { Screen, SessionGate } from "@/components/screens/Screen";
+import { useSession } from "@/providers/SessionProvider";
 
-export default function Today() {
-  return (
-    <View style={styles.screen}>
-      <Text style={styles.question}>What are you carrying today that you haven’t told anyone?</Text>
-      <Tree timeOfDay={0.5} answers={12} mine={[]} notes={[]} lanterns={0} style={styles.tree} />
-    </View>
-  );
+export default function Entry() {
+  return <SessionGate><JoinTree /></SessionGate>;
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#0b1030", paddingTop: 80, paddingHorizontal: 20 },
-  question: { color: "#f6efe6", fontSize: 28, fontStyle: "italic" },
-  tree: { flex: 1 },
-});
+function JoinTree() {
+  const { session } = useSession();
+  const [mode, setMode] = useState<"join" | "create">("join");
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [treeName, setTreeName] = useState("");
+
+  if (session?.treeId) return <Redirect href="/today" />;
+
+  return <Screen title="A little room to grow">
+    <Text>One question a day. A small circle of people. A tree you grow together.</Text>
+    <Button title={mode === "join" ? "Create a tree instead" : "Join a tree instead"} onPress={() => setMode(mode === "join" ? "create" : "join")} />
+    <TextInput accessibilityLabel="Your name" placeholder="Your name" value={name} onChangeText={setName} maxLength={60} autoComplete="name" />
+    {mode === "join" ? <TextInput accessibilityLabel="Tree invite code" placeholder="Six-character invite code" value={code} onChangeText={(value) => setCode(value.toUpperCase())} autoCapitalize="characters" autoCorrect={false} maxLength={6} /> : <TextInput accessibilityLabel="Tree name" placeholder="Tree name" value={treeName} onChangeText={setTreeName} maxLength={80} />}
+    <Text accessibilityRole="alert">Connecting the garden. Joining and creating trees will be available when the service is ready.</Text>
+    <Button title={mode === "join" ? "Join tree" : "Plant a tree"} disabled />
+    <Text>Your anonymous identity stays on this device. No account needed.</Text>
+  </Screen>;
+}
