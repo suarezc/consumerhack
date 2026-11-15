@@ -2,7 +2,6 @@ import "../safe-area.css";
 
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { Stack } from "expo-router";
-import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { SessionProvider } from "@/providers/SessionProvider";
 import { RitualProvider } from "@/providers/RitualProvider";
@@ -15,15 +14,13 @@ const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
 export default function RootLayout() {
   return (
     <ConvexProvider client={convex}>
-      <SafeAreaProvider>
-        <SessionProvider>
+      <SessionProvider>
           <DataBoundary fallback={(retry) => <DataFailure retry={retry} />}>
             <RitualProvider>
               <Stack screenOptions={{ headerShown: false }} />
             </RitualProvider>
           </DataBoundary>
-        </SessionProvider>
-      </SafeAreaProvider>
+      </SessionProvider>
     </ConvexProvider>
   );
 }

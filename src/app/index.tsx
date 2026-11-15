@@ -71,11 +71,11 @@ function JoinTree() {
     {!!error && !mode && <StoryText color="#ffd27a" accessibilityRole="alert">{error}</StoryText>}
     <StoryText variant="caption" color="#c6c1c2">No account. Your place in the circle stays on this device.</StoryText>
     {mode && <Panel title={mode === "join" ? "Find your circle." : "A small beginning."} onClose={() => { if (!busy) setMode(null); }}>
-      <StoryField label="Your name" value={name} onChangeText={setName} maxLength={60} autoComplete="name" editable={!busy} />
+      <StoryField labelColor="#f6efe6" errorColor="#ffd27a" label="Your name" value={name} onChangeText={setName} maxLength={60} autoComplete="name" editable={!busy} />
       {mode === "join"
-        ? <StoryField label="Six-character invite code" value={code} onChangeText={(value) => setCode(value.toUpperCase())} autoCapitalize="characters" autoCorrect={false} maxLength={6} editable={!busy} />
-        : <><StoryField label="Tree name" value={treeName} onChangeText={setTreeName} maxLength={80} editable={!busy} />
-          <StoryField label="A cause to support (optional)" value={cause} onChangeText={setCause} maxLength={120} editable={!busy} /></>}
+        ? <StoryField labelColor="#f6efe6" errorColor="#ffd27a" label="Six-character invite code" value={code} onChangeText={(value) => setCode(value.toUpperCase())} autoCapitalize="characters" autoCorrect={false} maxLength={6} editable={!busy} />
+        : <><StoryField labelColor="#f6efe6" errorColor="#ffd27a" label="Tree name" value={treeName} onChangeText={setTreeName} maxLength={80} editable={!busy} />
+          <StoryField labelColor="#f6efe6" errorColor="#ffd27a" label="A cause to support (optional)" value={cause} onChangeText={setCause} maxLength={120} editable={!busy} /></>}
       {!!error && <StoryText color="#ffd27a" accessibilityRole="alert">{error}</StoryText>}
       <StoryButton label={mode === "join" ? "Join tree" : "Plant tree"} loading={busy} onPress={() => { void submit(); }} />
     </Panel>}
