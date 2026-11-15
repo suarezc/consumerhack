@@ -32,7 +32,7 @@ export const restart = mutation({
         bloomedAt: start + 15 * 60 * 60 * 1000, isDemo: true, demoRunId: dayId });
       await ctx.db.insert("answers", { dayId: historyId, treeId, memberId: host!._id,
         text: samples[offset + 3].text, blossom: 0, createdAt: start + DAY_MS / 4 });
-      await ctx.db.insert("lanterns", { treeId, memberId: host!._id, amountCents: 50, status: "paid",
+      await ctx.db.insert("lanterns", { treeId, memberId: host!._id, amountCents: 100, status: "paid",
         whopCheckoutId: `demo:${dayId}:${date}`, createdAt: start + DAY_MS / 4,
         paidAt: start + DAY_MS / 4, creditedDate: date, source: "demo", demoRunId: dayId });
     }

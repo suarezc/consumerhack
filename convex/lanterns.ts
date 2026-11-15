@@ -151,7 +151,7 @@ export const applyPayment = internalMutation({
     }
     const facts = payment.paidAt === undefined ? {} : { paidAt: payment.paidAt, creditedDate: ritualWindow(payment.paidAt).date };
     if (lantern.status === "pending") {
-      await ctx.db.patch(lantern._id, { status: "paid", whopPaymentId: payment.paymentId, source: "whop", ...facts });
+      await ctx.db.patch(lantern._id, { status: "paid", whopPaymentId: payment.paymentId, source: "whop", confirmedAt: Date.now(), ...facts });
     } else {
       await ctx.db.insert("lanterns", {
         treeId: lantern.treeId,
@@ -162,6 +162,7 @@ export const applyPayment = internalMutation({
         whopCheckoutId: payment.checkoutId,
         whopPaymentId: payment.paymentId,
         createdAt: Date.now(),
+        confirmedAt: Date.now(),
         source: "whop",
         demoRunId: lantern.demoRunId,
         ...facts,
