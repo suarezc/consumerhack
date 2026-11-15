@@ -8,6 +8,7 @@ export default defineSchema({
     hostDeviceId: v.string(),
     cause: v.optional(v.object({ name: v.string(), goalCents: v.optional(v.number()) })),
     createdAt: v.number(),
+    demoDayId: v.optional(v.id("days")),
   }).index("by_code", ["code"]),
 
   members: defineTable({
@@ -15,6 +16,7 @@ export default defineSchema({
     deviceId: v.string(),
     name: v.string(),
     joinedAt: v.number(),
+    isDemo: v.optional(v.boolean()),
   })
     .index("by_tree", ["treeId"])
     .index("by_device", ["deviceId"])
@@ -27,8 +29,11 @@ export default defineSchema({
     opensAt: v.number(),
     bloomAt: v.number(),
     bloomedAt: v.optional(v.number()),
+    isDemo: v.optional(v.boolean()),
+    judgeQueuedAt: v.optional(v.number()),
   })
-    .index("by_tree_date", ["treeId", "date"]),
+    .index("by_tree_date", ["treeId", "date"])
+    .index("by_tree", ["treeId"]),
 
   answers: defineTable({
     dayId: v.id("days"),
