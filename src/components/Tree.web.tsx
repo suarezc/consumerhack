@@ -95,6 +95,8 @@ export function Tree(props: TreeProps) {
     props.mine,
     props.notes,
     props.lanterns,
+    props.fruits,
+    props.wateringEvent,
     synchronize,
   ]);
 

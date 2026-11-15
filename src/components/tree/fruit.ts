@@ -42,42 +42,26 @@ export function normalizeWateringEvent(
   return { id: event.id, fruitId: event.fruitId, revision };
 }
 
-export function fruitAnchor(id: string, sites: number) {
-  if (!validId(id) || !Number.isSafeInteger(sites) || sites < 1) return null;
+export function fruitAnchorSeed(id: string) {
+  if (!validId(id)) return null;
   let hash = 2166136261;
   for (let i = 0; i < id.length; i++)
     hash = Math.imul(hash ^ id.charCodeAt(i), 16777619);
-  const site = (hash >>> 0) % sites;
+  const key = hash >>> 0;
   hash = Math.imul(hash ^ 0x9e3779b9, 16777619) >>> 0;
   return {
-    site,
+    key,
     offsetX: ((hash & 1023) / 1023 - 0.5) * 0.12,
     offsetY: (((hash >>> 10) & 1023) / 1023 - 0.5) * 0.08,
   };
 }
 
-export function createWateringTracker() {
-  let initialized = false;
-  const consumed = new Set<string>();
+export function fruitAnchor(id: string, sites: number) {
+  const anchor = fruitAnchorSeed(id);
+  if (!anchor || !Number.isSafeInteger(sites) || sites < 1) return null;
   return {
-    observe(
-      value: unknown,
-      fruits: readonly TreeFruit[],
-    ): TreeWateringEvent | null {
-      const event = normalizeWateringEvent(value);
-      if (!initialized) {
-        initialized = true;
-        if (event) consumed.add(event.id);
-        return null;
-      }
-      if (
-        !event ||
-        consumed.has(event.id) ||
-        !fruits.some((fruit) => fruit.id === event.fruitId)
-      )
-        return null;
-      consumed.add(event.id);
-      return event;
-    },
+    site: anchor.key % sites,
+    offsetX: anchor.offsetX,
+    offsetY: anchor.offsetY,
   };
 }

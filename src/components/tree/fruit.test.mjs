@@ -14,12 +14,14 @@ function load(name, dependencies = {}) {
   return context.exports;
 }
 const fruit = load("fruit");
-const {
-  normalizeFruits,
-  normalizeWateringEvent,
-  fruitAnchor,
-  createWateringTracker,
-} = fruit;
+const { normalizeFruits, normalizeWateringEvent, fruitAnchor } = fruit;
+const runtime = readFileSync(
+  new URL("./fruitRuntime.ts", import.meta.url),
+  "utf8",
+).match(/String.raw`([\s\S]*)`;/)[1];
+const { createWateringTracker, createFruitLayer } = vm.runInNewContext(
+  runtime + "\n({createWateringTracker,createFruitLayer});",
+);
 const { normalizeTreeState } = load("bridge", { "./fruit": fruit });
 const plain = (value) => JSON.parse(JSON.stringify(value));
 const fruits = Object.freeze([
@@ -44,7 +46,11 @@ test("fruit transport is additive and leaves legacy props and caller arrays unch
   assert.equal(state.timeOfDay, legacy.timeOfDay);
   assert.equal(state.answers, 3);
   assert.equal(state.lanterns, 2);
-  assert.deepEqual(plain(state.fruits), fruits);
+  assert.deepEqual(
+    plain(state.fruits.map(({ anchor, ...value }) => value)),
+    fruits,
+  );
+  assert.ok(state.fruits.every((value) => Number.isInteger(value.anchor.key)));
   assert.equal(state.wateringEvent.id, "event-a");
   assert.equal(JSON.stringify(legacy), before);
   assert.equal(normalizeTreeState(legacy).wateringEvent, null);
@@ -148,4 +154,123 @@ test("fruit count changes alone never animate and unknown targets wait for a rea
   assert.deepEqual(plain(tracker.observe(event, updated)), event);
   assert.equal(tracker.observe(event, updated), null);
   assert.equal(createWateringTracker().observe(event, updated), null);
+});
+
+const geometry = {
+  buds: Array.from({ length: 12 }, (_, i) => ({
+    shown: true,
+    x: 100 + i * 10,
+    y: 200 - i * 3,
+  })),
+  unit: 100,
+  rootX: 160,
+  rootY: 400,
+  glow: {},
+};
+const payload = (values) =>
+  normalizeTreeState({
+    timeOfDay: 1,
+    answers: 0,
+    mine: [],
+    notes: [],
+    lanterns: 0,
+    fruits: values,
+  }).fruits;
+function draw(layer, now, reduced = false, scene = geometry) {
+  const operations = [];
+  const ctx = new Proxy(
+    {},
+    {
+      get(target, key) {
+        return key in target
+          ? target[key]
+          : (...args) =>
+              operations.push({
+                op: key,
+                args,
+                fill: target.fillStyle,
+                stroke: target.strokeStyle,
+              });
+      },
+    },
+  );
+  layer.draw(ctx, scene, now, reduced);
+  return operations;
+}
+const hasWater = (operations) =>
+  operations.some((x) => x.op === "stroke" && x.stroke === "#d5e6d4");
+
+test("actual layer paints hydrated fruit without a watering replay", () => {
+  const layer = createFruitLayer();
+  layer.update(
+    payload(fruits),
+    { id: "baseline", fruitId: "ledger-a", revision: 1 },
+    0,
+    false,
+  );
+  const initial = draw(layer, 0.4);
+  assert.equal(hasWater(initial), false);
+  assert.ok(initial.some((x) => x.op === "fill" && x.fill === "#ffd27a"));
+  assert.ok(initial.some((x) => x.op === "fill" && x.fill === "#d78c78"));
+  layer.update(
+    payload(fruits),
+    { id: "baseline", fruitId: "ledger-a", revision: 2 },
+    0.5,
+    false,
+  );
+  assert.equal(hasWater(draw(layer, 0.6)), false);
+});
+
+test("actual layer responds only to a fresh confirmed event and does not restart it", () => {
+  const layer = createFruitLayer();
+  layer.update(payload(fruits), null, 0, false);
+  const event = { id: "confirmed", fruitId: "ledger-a", revision: 1 };
+  layer.update(payload(fruits), event, 1, false);
+  assert.equal(hasWater(draw(layer, 1.4)), true);
+  layer.update(payload(fruits), { ...event, revision: 99 }, 2, false);
+  assert.equal(hasWater(draw(layer, 2.1)), false);
+  assert.equal(hasWater(draw(layer, 4)), false);
+  layer.update(
+    payload([...fruits, { id: "count-only", golden: false }]),
+    null,
+    5,
+    false,
+  );
+  assert.equal(hasWater(draw(layer, 5.4)), false);
+});
+
+test("reduced motion consumes confirmation without a stream or later replay", () => {
+  const layer = createFruitLayer();
+  layer.update(payload(fruits), null, 0, false);
+  const event = { id: "reduced", fruitId: "ledger-b", revision: 1 };
+  layer.update(payload(fruits), event, 1, true);
+  assert.equal(hasWater(draw(layer, 1.4, true)), false);
+  layer.update(payload(fruits), event, 2, false);
+  assert.equal(hasWater(draw(layer, 2.4)), false);
+});
+
+test("a confirmed watering pulses roots without changing an ungrown tree", () => {
+  const scene = {
+    ...geometry,
+    buds: geometry.buds.map((bud) => ({ ...bud, shown: false })),
+  };
+  const before = JSON.stringify(scene);
+  const layer = createFruitLayer();
+  layer.update(payload(fruits), null, 0, false);
+  layer.update(
+    payload(fruits),
+    { id: "root-only", fruitId: "ledger-a", revision: 1 },
+    1,
+    false,
+  );
+  const operations = draw(layer, 1.4, false, scene);
+  assert.equal(hasWater(operations), true);
+  assert.ok(
+    operations.some((x) => x.op === "stroke" && x.stroke === "#ffd27a"),
+  );
+  assert.equal(
+    operations.some((x) => x.op === "fill" && x.fill === "#d78c78"),
+    false,
+  );
+  assert.equal(JSON.stringify(scene), before);
 });

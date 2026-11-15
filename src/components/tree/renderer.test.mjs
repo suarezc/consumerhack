@@ -14,7 +14,14 @@ const referenceHelpers = reference.slice(
 const referenceGrowth = vm.runInNewContext(
   `${referenceHelpers}\n${reference.match(/const growth = \(v\) => [^;]+;/)[0]}\ngrowth;`,
 );
-const html = readFileSync(new URL("./html.ts", import.meta.url), "utf8");
+const fruitRuntime = readFileSync(
+  new URL("./fruitRuntime.ts", import.meta.url),
+  "utf8",
+).match(/String.raw`([\s\S]*)`;/)[1];
+const html = readFileSync(
+  new URL("./html.ts", import.meta.url),
+  "utf8",
+).replace("${FRUIT_RUNTIME}", fruitRuntime);
 
 function renderer(reducedMotion = true) {
   const messages = [];
