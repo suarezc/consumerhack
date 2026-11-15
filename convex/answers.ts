@@ -3,6 +3,7 @@ import { mutation, type MutationCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { activeDay, requireMember, textValue } from "./access";
 import { maybeBloom } from "./lifecycle";
+import { ensureMemberUser } from "./identity";
 
 export async function insertAnswer(ctx: MutationCtx, day: Doc<"days">, memberId: Doc<"members">["_id"], text: string) {
   if (!(await activeDay(ctx, day))) throw new ConvexError("That demo has ended");
@@ -13,7 +14,10 @@ export async function insertAnswer(ctx: MutationCtx, day: Doc<"days">, memberId:
   if (Date.now() < day.opensAt) throw new ConvexError("This day has not opened yet");
   const answers = await ctx.db.query("answers").withIndex("by_day", q => q.eq("dayId", day._id)).collect();
   const blossom = answers.length;
-  const answerId = await ctx.db.insert("answers", { dayId: day._id, treeId: day.treeId, memberId, text, blossom, createdAt: Date.now() });
+  const member = await ctx.db.get(memberId);
+  if (!member) throw new ConvexError("Membership required");
+  const userId = await ensureMemberUser(ctx, member);
+  const answerId = await ctx.db.insert("answers", { dayId: day._id, treeId: day.treeId, memberId, userId, text, blossom, createdAt: Date.now() });
   await maybeBloom(ctx, day);
   return { answerId, blossom };
 }
