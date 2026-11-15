@@ -62,6 +62,7 @@ export function GroveThumbnail({ dayLabel, question, answers, missed = false, ti
   const sample = isDemo || fruits.some((fruit) => fruit.source === 'demo');
   const fruitCount = `${fruits.length} ${fruits.length === 1 ? 'fruit' : 'fruits'} from your giving`;
   const fruitDescription = fruits.length ? `${fruitCount}. ${[...new Set(fruits.map(describeFruit))].join('. ')}` : '';
+  const milestones = [...new Set(fruits.filter((fruit) => fruit.golden && fruit.milestone).map((fruit) => fruit.milestone))];
   const accessibleDescription = `${sample ? 'Demo sample history. ' : ''}${dayLabel}. ${question ?? ''}. ${summary}. ${fruitDescription}`;
   const positions = missed ? [[82, 58], [59, 76], [92, 78], [73, 96], [83, 84], [65, 66]]
     : [[40, 58], [69, 36], [99, 61], [55, 83], [87, 92], [29, 88]];
@@ -83,6 +84,9 @@ export function GroveThumbnail({ dayLabel, question, answers, missed = false, ti
       {!!question && <StoryText variant="caption" color={theme.paper}>{question}</StoryText>}
       <StoryText variant="meta" color={missed ? theme.muted : theme.lantern}>{missed ? 'A quiet day' : summary}</StoryText>
       {fruits.length > 0 && <StoryText variant="meta" color={theme.paper} accessibilityLabel={fruitDescription}>{fruitCount}</StoryText>}
+      {fruits.some((fruit) => fruit.golden) && <StoryText variant="meta" color={theme.lantern}>
+        {milestones.length ? `${milestones.join(' · ')}-day giving milestone` : 'Golden fruit'}
+      </StoryText>}
     </View>
   </>;
   const baseStyle = [styles.thumbnail, { backgroundColor: theme.panel, borderColor: theme.line, opacity: disabled ? 0.5 : 1 }];
