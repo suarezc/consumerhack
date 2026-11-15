@@ -56,10 +56,15 @@ export function installForegroundNotificationGuard(
       if (active && data?.kind === "watering-streak" && typeof date === "string" &&
         /^\d{4}-\d{2}-\d{2}$/.test(date) && !seen.has(date)) {
         seen.add(date);
+        let timer: ReturnType<typeof setTimeout> | undefined;
         try {
-          display = await eligible(date);
+          display = await Promise.race([eligible(date), new Promise<false>((resolve) => {
+            timer = setTimeout(() => resolve(false), 1_000);
+          })]);
         } catch {
           display = false;
+        } finally {
+          clearTimeout(timer);
         }
       }
       display = active && display;
