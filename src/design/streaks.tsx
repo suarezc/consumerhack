@@ -54,7 +54,7 @@ export function GroveGivingSummary({ summary, color }: GroveGivingSummaryProps) 
     </View>
     {summary.undatedPaidCount > 0 && <StoryText variant="caption" color={ink}
       accessibilityLabel={`${summary.undatedPaidCount} confirmed ${summary.undatedPaidCount === 1 ? 'payment is' : 'payments are'} awaiting a verified date. Included in the total, not in streaks or dated fruit.`}>
-      Some confirmed giving is awaiting a verified date.
+      Some confirmed giving awaits a verified date. It is included in the total, not in streaks or dated fruit.
     </StoryText>}
   </View>;
 }
