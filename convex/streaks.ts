@@ -3,6 +3,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { query, type QueryCtx, type MutationCtx } from "./_generated/server";
 import { requireMember } from "./access";
 import { currentStreak, longestStreak, milestone, ritualClock } from "./lib/streakLogic";
+import { bundleCount, hasCreditedDate, paidForDay } from "./lib/wateringFacts";
 
 type ReadCtx = QueryCtx | MutationCtx;
 
@@ -28,7 +29,7 @@ export async function userContributions(ctx: ReadCtx, deviceId: string, run: Doc
     for (const row of await ctx.db.query("lanterns").withIndex("by_member", q => q.eq("memberId", member._id)).collect()) {
       if (row.status !== "paid" || (run ? row.demoRunId !== run._id : row.source === "demo")) continue;
       paid.push(row);
-      if (row.creditedDate && row.paidAt !== undefined) givingDates.add(row.creditedDate);
+      if (hasCreditedDate(row)) givingDates.add(row.creditedDate!);
     }
   }
   return { answerDates, givingDates, paid };
@@ -49,13 +50,13 @@ export async function userSummary(ctx: ReadCtx, deviceId: string, run: Doc<"days
   };
 }
 
-export async function dayGiving(ctx: ReadCtx, treeId: Id<"trees">, date: string, viewer: Id<"members">, run: Doc<"days"> | null, ownOnly = false) {
-  const rows = (await ctx.db.query("lanterns").withIndex("by_tree", q => q.eq("treeId", treeId)).collect())
-    .filter(row => row.status === "paid" && row.paidAt !== undefined && row.creditedDate === date &&
-      (run ? row.demoRunId === run._id : row.source !== "demo") && (!ownOnly || row.memberId === viewer));
+export async function dayGiving(ctx: ReadCtx, day: Doc<"days">, viewer: Id<"members">, run: Doc<"days"> | null, ownOnly = false) {
+  const date = day.ritualDate ?? day.date;
+  const rows = (await ctx.db.query("lanterns").withIndex("by_tree", q => q.eq("treeId", day.treeId)).collect())
+    .filter(row => paidForDay(row, day) && (!ownOnly || row.memberId === viewer));
   const datesByMember = new Map<string, Set<string>>();
   const fruits = [];
-  for (const row of rows.sort((a, b) => a.paidAt! - b.paidAt! || a._id.localeCompare(b._id))) {
+  for (const row of rows.sort((a, b) => (a.paidAt ?? a.createdAt) - (b.paidAt ?? b.createdAt) || a._id.localeCompare(b._id))) {
     let dates = datesByMember.get(row.memberId);
     if (!dates) {
       const member = await ctx.db.get(row.memberId);
@@ -64,12 +65,15 @@ export async function dayGiving(ctx: ReadCtx, treeId: Id<"trees">, date: string,
       datesByMember.set(row.memberId, dates);
     }
     const reached = milestone(dates, date);
-    fruits.push({ fruitId: row._id, date, golden: reached !== null, isMine: row.memberId === viewer,
-      milestone: reached, source: row.source ?? "whop" as const, paidAt: row.paidAt! });
+    for (let index = 0; index < bundleCount(row); index++) {
+      fruits.push({ fruitId: `${row._id}:${index}`, date, golden: reached !== null, isMine: row.memberId === viewer,
+        milestone: reached, source: row.source ?? "whop" as const, paidAt: row.paidAt ?? null });
+    }
   }
-  const latest = rows.filter(row => row.memberId === viewer && row.confirmedAt !== undefined)
+  const latest = rows.filter(row => row.memberId === viewer && row.confirmedAt !== undefined && bundleCount(row) > 0)
     .sort((a, b) => a.confirmedAt! - b.confirmedAt! || a._id.localeCompare(b._id)).at(-1);
-  return { fruits, wateringEvent: latest ? { id: latest._id, fruitId: latest._id, revision: 1 } : null };
+  const fruitIds = latest ? Array.from({ length: bundleCount(latest) }, (_, index) => `${latest._id}:${index}`) : [];
+  return { fruits, wateringEvent: latest ? { id: latest._id, fruitId: fruitIds[0], fruitIds, revision: 1 } : null };
 }
 
 export const summary = query({

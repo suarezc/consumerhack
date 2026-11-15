@@ -12,6 +12,11 @@ export function validateAmount(amountCents: number) {
   }
 }
 
+export function bundleCents(bundles: number) {
+  if (bundles !== 2 && bundles !== 5 && bundles !== 10) throw new Error("Choose 2, 5 or 10 bundles");
+  return bundles * 50;
+}
+
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error("Invalid payment data");
@@ -56,6 +61,10 @@ export type VerifiedPayment = {
   answerId?: string;
   amountCents: number;
   paidAt?: number;
+  userId?: string;
+  dayId?: string;
+  bundles?: number;
+  recipientAccountId?: string;
 };
 
 export function verifyPayment(
@@ -79,10 +88,15 @@ export function verifyPayment(
     throw new Error("Payment total does not match price and tax");
   }
   const metadata = object(payment.metadata);
-  if (metadata.integration !== "storytime-lantern-sandbox" ||
+  const canonical = metadata.integration === "storytime-watering-sandbox-v2";
+  if ((!canonical && metadata.integration !== "storytime-lantern-sandbox") ||
       typeof metadata.treeId !== "string" || typeof metadata.memberId !== "string" ||
       (metadata.answerId !== undefined && typeof metadata.answerId !== "string")) {
     throw new Error("Payment is not a StoryTime lantern");
+  }
+  if (canonical && (typeof metadata.userId !== "string" || typeof metadata.dayId !== "string" ||
+      typeof metadata.bundles !== "number" || bundleCents(metadata.bundles) !== amountCents)) {
+    throw new Error("Payment does not match its watering intent");
   }
   const paidAt = payment.paid_at == null ? undefined :
     typeof payment.paid_at === "string" && /^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(payment.paid_at) ? Date.parse(payment.paid_at) : NaN;
@@ -95,12 +109,15 @@ export function verifyPayment(
     ...(metadata.answerId === undefined ? {} : { answerId: metadata.answerId }),
     amountCents,
     ...(paidAt === undefined ? {} : { paidAt }),
+    ...(canonical ? { userId: metadata.userId as string, dayId: metadata.dayId as string,
+      bundles: metadata.bundles as number, recipientAccountId: accountId } : {}),
   };
 }
 
 export function matchLantern(
   lantern: { treeId: string; memberId: string; answerId?: string; amountCents: number;
-    whopCheckoutId: string; status: "pending" | "paid"; whopPaymentId?: string },
+    whopCheckoutId: string; status: "pending" | "paid"; whopPaymentId?: string;
+    userId?: string; dayId?: string; bundles?: number; attribution?: string; expectedRecipientAccountId?: string },
   payment: VerifiedPayment,
 ) {
   if (lantern.whopCheckoutId !== payment.checkoutId || lantern.treeId !== payment.treeId ||
@@ -108,6 +125,11 @@ export function matchLantern(
       lantern.amountCents !== payment.amountCents) {
     throw new Error("Payment does not match the pending lantern");
   }
+  if (lantern.attribution === "checkout_day" && (payment.userId !== lantern.userId || payment.dayId !== lantern.dayId ||
+      payment.bundles !== lantern.bundles || payment.recipientAccountId !== lantern.expectedRecipientAccountId)) {
+    throw new Error("Payment does not match its authorized user, day, bundles or recipient");
+  }
+  if (payment.userId !== undefined && lantern.attribution !== "checkout_day") throw new Error("Payment contract does not match legacy checkout");
   return lantern.whopPaymentId !== payment.paymentId;
 }
 
