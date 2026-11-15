@@ -38,13 +38,14 @@ async function fixture(date: string, priorDates: string[]) {
   });
   const intent = await t.mutation(internal.lanterns.prepareWatering, { deviceId, treeId: tree.treeId, dayId: tree.dayId, bundles: 2 });
   await t.mutation(internal.lanterns.attachCheckout, { wateringId: intent.wateringId, checkoutId: "ch_attribution_fixture" });
-  const settle = () => t.mutation(internal.lanterns.applyPayment, {
+  const payment = {
     paymentId: "pay_attribution_fixture", checkoutId: "ch_attribution_fixture", treeId: tree.treeId,
     memberId: intent.memberId, answerId: intent.answerId, userId: intent.userId, dayId: intent.dayId,
-    bundles: intent.bundles, amountCents: intent.amountCents, paidAt: Date.now(), recipientAccountId: intent.expectedRecipientAccountId,
-  });
+    bundles: intent.bundles, amountCents: intent.amountCents, recipientAccountId: intent.expectedRecipientAccountId,
+  };
+  const settle = (paidAt: number | null = Date.now()) => t.mutation(internal.lanterns.applyPayment, { ...payment, paidAt: paidAt ?? undefined });
   const rows = () => t.run(ctx => ctx.db.query("notificationOutbox").collect());
-  return { t, tree, intent, settle, rows };
+  return { t, tree, intent, payment, settle, rows };
 }
 
 describe("charity target-day reminder attribution", () => {
@@ -86,5 +87,23 @@ describe("charity target-day reminder attribution", () => {
     await f.settle();
     expect(await f.t.mutation(internal.notifications.claim, { outboxId: row._id })).toBeNull();
     expect((await f.rows())[0].state).toBe("suppressed");
+  });
+
+  it("backfills provider time without shifting an authorized prior-day credit or reopening its reminder", async () => {
+    const f = await fixture("2026-11-14", ["2026-11-12", "2026-11-13"]);
+    vi.setSystemTime(new Date("2026-11-15T20:00:00Z"));
+    const current = await f.t.mutation(api.trees.create, { deviceId, name: "Backfill source", memberName: "Host" });
+    await f.t.mutation(api.answers.submit, { deviceId, dayId: current.dayId, text: "A little care" });
+    await f.settle(null);
+    await f.t.run(ctx => queuePaidUserNotifications(ctx, deviceId));
+    const row = (await f.rows())[0];
+    expect(row).toMatchObject({ dayId: current.dayId, state: "queued" });
+    await f.t.mutation(internal.lanterns.backfillPaymentFacts, {
+      ...f.payment, rowId: f.intent.wateringId, paidAt: Date.now(),
+    });
+    await f.t.run(ctx => queuePaidUserNotifications(ctx, deviceId));
+    expect(await f.rows()).toHaveLength(1);
+    expect(await f.t.run(ctx => ctx.db.get(f.intent.wateringId))).toMatchObject({ creditedDate: "2026-11-14", paidAt: Date.now() });
+    expect(await f.t.mutation(internal.notifications.claim, { outboxId: row._id })).toMatchObject({ streak: 3 });
   });
 });
