@@ -80,7 +80,7 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
     onOpenTree={() => { setError(""); setSettings(true); }}
     underQuestion={<View style={sceneStyles.stack}>
       <TodayCharitySummary charity={today.charity} totalRaisedCents={today.totalRaisedCents} isDemo={today.day.isDemo} onShowDetails={() => { setError(""); setCharityOpen(true); }} />
-      <TodayStreaks compact summary={today.streaks} color={theme.ink} />
+      <TodayStreaks compact summary={today.streaks} color={theme.text} />
     </View>}
     tree={{ answers: today.answerCount, mine: today.myAnswer ? [today.myAnswer.blossom] : [], notes, lanterns: 0, onTapBlossom: choose,
       fruits: today.fruits.map((fruit) => ({ id: fruit.fruitId, golden: fruit.golden, mine: fruit.isMine })), wateringEvent: watering.treeEvent }}

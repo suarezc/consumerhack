@@ -169,3 +169,19 @@ test("bundle hydration and day changes remain silent with separate payment and f
   store.observe("tree:next-day", event.fruitIds, event, 4, false);
   assert.equal(store.getSnapshot().treeEvent, null);
 });
+
+test("one newly settled legacy $100 payment delivers all 200 fruits to both consumers once", () => {
+  const store = observer();
+  store.observe("tree:day", [], null, 3, false);
+  const fruitIds = Array.from({ length: 200 }, (_, index) => `legacy-payment:${index}`);
+  const event = { id: "legacy-payment", fruitId: fruitIds[0], fruitIds, revision: 1 };
+  store.observe("tree:day", fruitIds, event, 4, false);
+  const dispatch = store.getSnapshot();
+  assert.deepEqual(dispatch.treeEvent.fruitIds, fruitIds);
+  assert.deepEqual(dispatch.feedbackEvent, { id: "legacy-payment", baselineId: "baseline-1", givingCount: 4, isDemo: false });
+  store.consumeFeedback("legacy-payment");
+  assert.equal(store.getSnapshot().treeEvent, dispatch.treeEvent);
+  store.observe("tree:day", fruitIds, event, 4, false);
+  assert.equal(store.getSnapshot().treeEvent, dispatch.treeEvent);
+  assert.equal(store.getSnapshot().feedbackEvent, null);
+});
