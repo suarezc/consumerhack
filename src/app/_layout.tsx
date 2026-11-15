@@ -25,3 +25,4 @@ export default function RootLayout() {
     </ConvexProvider>
   );
 }
+import "../safe-area.css";

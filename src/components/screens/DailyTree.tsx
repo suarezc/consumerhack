@@ -5,10 +5,11 @@ import { View } from "react-native";
 
 import { Panel, Scene, sceneStyles } from "@/components/screens/Scene";
 import { LoadingDay, TreeNavigation } from "@/components/screens/Screen";
+import { LanternComposer } from "@/components/screens/LanternComposer";
 import { AnswerCard, StoryButton, StoryField, StoryText } from "@/design";
 import { useRitual, type Today } from "@/providers/RitualProvider";
 import { useSession } from "@/providers/SessionProvider";
-import { api } from "@/services/api";
+import { api, type Id } from "@/services/api";
 import { mutationError } from "@/services/errors";
 import { bloomLabel } from "@/services/ritual";
 
@@ -35,6 +36,7 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
   const [error, setError] = useState("");
   const [noteSent, setNoteSent] = useState(false);
   const [settings, setSettings] = useState(false);
+  const [lanternTarget, setLanternTarget] = useState<Id<"answers"> | null | undefined>(undefined);
   const unlocked = today.myAnswer !== null && today.day.bloomedAt !== undefined;
   const selected = unlocked ? today.answers.find((answer) => answer.blossom === selectedIndex) ?? null : null;
   const canAnswer = !today.myAnswer && today.day.bloomedAt === undefined && now >= today.day.opensAt && now < today.day.bloomAt;
@@ -73,7 +75,8 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
     overlay={() => (
     <AnswerCard open={selected !== null} answer={selected && { id: selected.answerId, text: selected.text, author: selected.name, isMine: selected.memberId === today.member.memberId }}
       onClose={() => { if (!busy) { setSelectedIndex(null); setNoteComposer(false); setError(""); } }}
-      onNote={() => { setNoteComposer(true); setNoteSent(false); }} noteLoading={busy} error={error}>
+      onNote={() => { setNoteComposer(true); setNoteSent(false); }} noteLoading={busy} error={error}
+      onLantern={today.tree.cause && selected ? () => setLanternTarget(selected.answerId) : undefined}>
       {selected && today.notes.filter((item) => item.answerId === selected.answerId).map((item) => <View key={item.noteId} style={sceneStyles.stack}>
         <StoryText variant="meta" color="#c6c1c2">Private · {item.fromMemberId === today.member.memberId ? "from you" : item.fromName}</StoryText>
         <StoryText color="#f6efe6">{item.text}</StoryText>
@@ -86,7 +89,6 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
           if (session && note.trim()) void run(() => sendNote({ deviceId: session.deviceId, answerId: selected.answerId, text: note.trim() }), () => { setNoteComposer(false); setNote(""); setNoteSent(true); });
         }} />
       </View>}
-      {today.tree.cause && <StoryText variant="caption" color="#c6c1c2">Lantern checkout is not available yet. No payment will be taken here.</StoryText>}
     </AnswerCard>
     )}>
     {today.day.isDemo && <StoryText variant="meta" color="#ffd27a">Demo day · sample answers join your real answer</StoryText>}
@@ -111,6 +113,7 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
     {settings && <Panel title={today.tree.name} onClose={() => { if (!busy) setSettings(false); }}>
       <StoryText variant="meta" color="#f6efe6">Invite code · {today.tree.code}</StoryText>
       <StoryText color="#f6efe6">Share this code with your circle. Your anonymous identity is not part of the invite.</StoryText>
+      {today.tree.cause && <StoryButton label="Hang a lantern · sandbox" onPress={() => { setSettings(false); setLanternTarget(null); }} />}
       {today.tree.isHost && <>
         <StoryText variant="caption" color="#c6c1c2">The one-minute demo adds clearly labelled sample answers. You still answer to unlock the bloom. A replay starts a fresh sample day.</StoryText>
         <StoryButton label={today.day.isDemo ? "Replay one-minute demo" : "Start one-minute demo"} loading={busy} onPress={() => {
@@ -125,5 +128,7 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
         void run(() => selectTree(null), () => router.replace("/"));
       }} />
     </Panel>}
+    {lanternTarget !== undefined && today.tree.cause && <LanternComposer treeId={today.tree.treeId}
+      answerId={lanternTarget ?? undefined} cause={today.tree.cause.name} onClose={() => setLanternTarget(undefined)} />}
   </Scene>;
 }
