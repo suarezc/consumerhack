@@ -1,8 +1,9 @@
 import { useMutation, useQuery } from "convex/react";
 import { Redirect } from "expo-router";
 import { useRef, useState } from "react";
+import { View } from "react-native";
 
-import { Panel, Scene } from "@/components/screens/Scene";
+import { Panel, Scene, sceneStyles } from "@/components/screens/Scene";
 import { SessionGate } from "@/components/screens/Screen";
 import { StoryButton, StoryField, StoryText } from "@/design";
 import { useRitual } from "@/providers/RitualProvider";
@@ -59,8 +60,10 @@ function JoinTree() {
 
   return <Scene timeOfDay={timeOfDay} meta="StoryTime · a daily ritual"
     title="What grows when we make a little room for each other?" detail="One question a day. One blossom for every answer.">
-    <StoryButton label="Join your circle" onPress={() => { setError(""); setMode("join"); }} />
-    <StoryButton label="Plant a tree" tone="quiet" onPress={() => { setError(""); setMode("create"); }} />
+    <View style={sceneStyles.row}>
+      <StoryButton label="Join your circle" onPress={() => { setError(""); setMode("join"); }} style={{ flex: 1 }} />
+      <StoryButton label="Plant a tree" tone="quiet" onPress={() => { setError(""); setMode("create"); }} style={{ flex: 1 }} />
+    </View>
     {trees?.map((tree) => <StoryButton key={tree.treeId} label={`Return to ${tree.name}`} tone="quiet" disabled={busy} onPress={() => {
       setBusy(true);
       void selectTree(tree.treeId).catch(() => setError("This device couldn’t remember the tree. Please try again.")).finally(() => setBusy(false));

@@ -1,6 +1,6 @@
-import { type ReactNode } from "react";
-import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useState, type ReactNode } from "react";
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Tree, type TreeProps } from "@/components/Tree";
 import { StoryButton, StoryText, useStoryTime } from "@/design";
@@ -12,23 +12,28 @@ type SceneProps = {
   detail?: string;
   tree?: Partial<Pick<TreeProps, "answers" | "mine" | "notes" | "lanterns" | "onTapBlossom">>;
   children?: ReactNode;
+  overlay?: (controlsHeight: number) => ReactNode;
+  onOpenTree?: () => void;
 };
 
-export function Scene({ timeOfDay, title, meta, detail, tree, children }: SceneProps) {
+export function Scene({ timeOfDay, title, meta, detail, tree, children, overlay, onOpenTree }: SceneProps) {
   const { theme } = useStoryTime();
+  const insets = useSafeAreaInsets();
+  const [controlsHeight, setControlsHeight] = useState(120);
   return <View style={[styles.scene, { backgroundColor: theme.skyTop }]}>
     <Tree timeOfDay={timeOfDay} answers={tree?.answers ?? 0} mine={tree?.mine ?? []}
       notes={tree?.notes ?? []} lanterns={tree?.lanterns ?? 0} onTapBlossom={tree?.onTapBlossom}
       style={StyleSheet.absoluteFill} />
     <SafeAreaView style={styles.scene} pointerEvents="box-none">
-      <View style={styles.top} pointerEvents="none">
-        <StoryText variant="meta" color={theme.ink}>{meta}</StoryText>
+      <View style={styles.top} pointerEvents="box-none">
+        {onOpenTree ? <Pressable accessibilityRole="button" accessibilityLabel="Your tree" onPress={onOpenTree} style={{ minHeight: 32, justifyContent: "center" }}><StoryText variant="meta" color={theme.ink}>{meta} · settings</StoryText></Pressable> : <StoryText variant="meta" color={theme.ink}>{meta}</StoryText>}
         <StoryText variant="question" color={theme.ink} accessibilityRole="header">{title}</StoryText>
         {!!detail && <StoryText variant="caption" color={theme.ink}>{detail}</StoryText>}
       </View>
       <View pointerEvents="box-none" style={styles.space} />
-      <View style={[styles.controls, { backgroundColor: theme.panel }]}>{children}</View>
+      <View onLayout={(event) => setControlsHeight(event.nativeEvent.layout.height)} style={styles.controls}>{children}</View>
     </SafeAreaView>
+    {overlay?.(controlsHeight + insets.bottom)}
   </View>;
 }
 
@@ -57,7 +62,7 @@ const styles = StyleSheet.create({
   scene: { flex: 1 },
   top: { paddingHorizontal: 22, paddingTop: 18, gap: 10, maxWidth: 560 },
   space: { flex: 1, minHeight: 160 },
-  controls: { paddingHorizontal: 20, paddingVertical: 16, gap: 12 },
+  controls: { paddingHorizontal: 20, paddingVertical: 12, gap: 8 },
   overlay: { flex: 1, backgroundColor: "rgba(4,5,13,0.35)", justifyContent: "flex-end" },
   panelHost: { maxHeight: "92%", width: "100%", maxWidth: 560, alignSelf: "center" },
   panel: { padding: 24, gap: 18, borderTopWidth: 1 },

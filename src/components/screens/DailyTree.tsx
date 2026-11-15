@@ -65,30 +65,12 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
     setError("");
   }
 
-  const detail = unlocked ? `${today.answerCount} blossoms · tap one to read` : `${today.answerCount} of ${today.memberCount} answered · ${today.day.isDemo ? "one-minute demo" : `bloom ${bloomLabel(today.day.bloomAt)} local time`}`;
+  const detail = unlocked ? `${today.answerCount} ${today.answerCount === 1 ? "blossom" : "blossoms"} · tap one to read` : `${today.answerCount} of ${today.memberCount} answered · ${today.day.isDemo ? "one-minute demo" : `bloom ${bloomLabel(today.day.bloomAt)} local time`}`;
   return <Scene timeOfDay={timeOfDay} title={today.day.question}
     meta={`StoryTime · ${today.tree.name}${today.day.isDemo ? " · sample day" : ""}`} detail={detail}
-    tree={{ answers: today.answerCount, mine: today.myAnswer ? [today.myAnswer.blossom] : [], notes, lanterns: today.lanternCount, onTapBlossom: choose }}>
-    {today.day.isDemo && <StoryText variant="meta" color="#ffd27a">Demo day · sample answers join your real answer</StoryText>}
-    {canAnswer && <StoryButton label="Add my answer" onPress={() => { setError(""); setComposer(true); }} />}
-    {today.myAnswer && !unlocked && <StoryText color="#f6efe6">Your blossom is on the tree. The answers open when everyone has answered, or at bloom time.</StoryText>}
-    {!today.myAnswer && !canAnswer && <StoryText color="#f6efe6">{now < today.day.opensAt ? "The question opens soon." : "This day has closed. Come back for tomorrow’s question."}</StoryText>}
-    {unlocked && <StoryButton label={bloom ? "Read a blossom" : "The tree has bloomed"} onPress={() => {
-      if (!bloom) router.replace("/bloom");
-      else if (today.answers[0]) choose(today.answers[0].blossom);
-    }} />}
-    {today.tree.cause && <StoryText variant="caption" color="#f6efe6">{today.tree.cause.name} · ${(today.raisedCents / 100).toFixed(2)} raised · {today.lanternCount} paid lanterns</StoryText>}
-    <TreeNavigation />
-    <StoryButton label="Your tree" tone="quiet" onPress={() => { setError(""); setSettings(true); }} />
-    {!!error && !composer && !selected && !settings && <StoryText color="#ffd27a" accessibilityRole="alert">{error}</StoryText>}
-    {composer && <Panel title="What’s on your mind?" onClose={() => { if (!busy) setComposer(false); }}>
-      <StoryField label="Your answer" value={draft} onChangeText={setDraft} multiline maxLength={2000} editable={!busy} style={{ minHeight: 140 }} />
-      <StoryText variant="caption" color="#c6c1c2">One answer for this day. It opens to your circle at bloom, and may become a kindred answer on another tree.</StoryText>
-      {!!error && <StoryText color="#ffd27a" accessibilityRole="alert">{error}</StoryText>}
-      <StoryButton label="Let it blossom" disabled={!draft.trim()} loading={busy} onPress={() => {
-        if (session && draft.trim()) void run(() => submitAnswer({ deviceId: session.deviceId, dayId: today.day.dayId, text: draft.trim() }), () => { setComposer(false); setDraft(""); });
-      }} />
-    </Panel>}
+    onOpenTree={() => { setError(""); setSettings(true); }}
+    tree={{ answers: today.answerCount, mine: today.myAnswer ? [today.myAnswer.blossom] : [], notes, lanterns: today.lanternCount, onTapBlossom: choose }}
+    overlay={() => (
     <AnswerCard open={selected !== null} answer={selected && { id: selected.answerId, text: selected.text, author: selected.name, isMine: selected.memberId === today.member.memberId }}
       onClose={() => { if (!busy) { setSelectedIndex(null); setNoteComposer(false); setError(""); } }}
       onNote={() => { setNoteComposer(true); setNoteSent(false); }} noteLoading={busy} error={error}>
@@ -106,6 +88,26 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
       </View>}
       {today.tree.cause && <StoryText variant="caption" color="#c6c1c2">Lantern checkout is not available yet. No payment will be taken here.</StoryText>}
     </AnswerCard>
+    )}>
+    {today.day.isDemo && <StoryText variant="meta" color="#ffd27a">Demo day · sample answers join your real answer</StoryText>}
+    {canAnswer && <StoryButton label="Add my answer" onPress={() => { setError(""); setComposer(true); }} />}
+    {today.myAnswer && !unlocked && <StoryText color="#f6efe6">Your blossom is on the tree. The answers open when everyone has answered, or at bloom time.</StoryText>}
+    {!today.myAnswer && !canAnswer && <StoryText color="#f6efe6">{now < today.day.opensAt ? "The question opens soon." : "This day has closed. Come back for tomorrow’s question."}</StoryText>}
+    {unlocked && <StoryButton label={bloom ? "Read a blossom" : "The tree has bloomed"} onPress={() => {
+      if (!bloom) router.replace("/bloom");
+      else if (today.answers[0]) choose(today.answers[0].blossom);
+    }} />}
+    {today.tree.cause && <StoryText variant="caption" color="#f6efe6">{today.tree.cause.name} · ${(today.raisedCents / 100).toFixed(2)} raised · {today.lanternCount} paid lanterns</StoryText>}
+    <TreeNavigation />
+    {!!error && !composer && !selected && !settings && <StoryText color="#ffd27a" accessibilityRole="alert">{error}</StoryText>}
+    {composer && <Panel title="What’s on your mind?" onClose={() => { if (!busy) setComposer(false); }}>
+      <StoryField label="Your answer" value={draft} onChangeText={setDraft} multiline maxLength={2000} editable={!busy} style={{ minHeight: 140 }} />
+      <StoryText variant="caption" color="#c6c1c2">One answer for this day. It opens to your circle at bloom, and may become a kindred answer on another tree.</StoryText>
+      {!!error && <StoryText color="#ffd27a" accessibilityRole="alert">{error}</StoryText>}
+      <StoryButton label="Let it blossom" disabled={!draft.trim()} loading={busy} onPress={() => {
+        if (session && draft.trim()) void run(() => submitAnswer({ deviceId: session.deviceId, dayId: today.day.dayId, text: draft.trim() }), () => { setComposer(false); setDraft(""); });
+      }} />
+    </Panel>}
     {settings && <Panel title={today.tree.name} onClose={() => { if (!busy) setSettings(false); }}>
       <StoryText variant="meta" color="#f6efe6">Invite code · {today.tree.code}</StoryText>
       <StoryText color="#f6efe6">Share this code with your circle. Your anonymous identity is not part of the invite.</StoryText>
