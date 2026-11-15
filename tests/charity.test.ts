@@ -146,13 +146,14 @@ describe("authorized immutable bundle intents", () => {
     const five = await intent(t, tree, 5);
     const args = { deviceId, treeId: tree.treeId };
     expect((await t.query(api.days.today, args))?.totalRaisedCents).toBe(0);
-    expect((await t.query(api.days.today, args))?.fruits).toEqual([]);
+    expect((await t.query(api.days.today, args))?.fruits).toHaveLength(1);
+    expect((await t.query(api.days.today, args))?.lightBundles).toBe(0);
     const paid = payment(five);
     await Promise.all(Array.from({ length: 4 }, () => t.mutation(internal.lanterns.applyPayment, paid)));
     const first = await t.query(api.days.today, args);
-    const fruitIds = Array.from({ length: 5 }, (_, index) => `${five.wateringId}:${index}`);
-    expect(first?.fruits.map(fruit => fruit.fruitId)).toEqual(fruitIds);
-    expect(first?.wateringEvent).toEqual({ id: five.wateringId, fruitId: fruitIds[0], fruitIds, revision: 1 });
+    expect(first?.fruits.map(fruit => fruit.fruitId)).toEqual([`response:${first?.myAnswer?.answerId}`]);
+    expect(first?.lightBundles).toBe(5);
+    expect(first?.lightEvent).toEqual({ id: five.wateringId, lightBundles: 5, revision: 2 });
     expect(first).toMatchObject({ totalRaisedCents: 250, myGivenCents: 250, watererCount: 1, answererCount: 1 });
     expect(first?.answers).toEqual([]);
     const secondPay = payment(five, "pay_repeatlink", Date.now() + 1);
@@ -162,15 +163,17 @@ describe("authorized immutable bundle intents", () => {
     await t.mutation(internal.lanterns.applyPayment, payment(ten));
     let state = await t.query(api.days.today, args);
     expect(state).toMatchObject({ totalRaisedCents: 1000, watererCount: 1 });
-    expect(state?.fruits).toHaveLength(20);
-    expect(new Set(state?.fruits.map(fruit => fruit.fruitId)).size).toBe(20);
+    expect(state?.fruits).toHaveLength(1);
+    expect(state?.fruits).toEqual(first?.fruits);
+    expect(state?.lightBundles).toBe(20);
     expect(state?.streaks.giving).toMatchObject({ count: 1, status: "current", totalCents: 1000 });
     await answer(t, tree, friend);
     const other = await intent(t, tree, 2, friend);
     await t.mutation(internal.lanterns.applyPayment, payment(other));
     state = await t.query(api.days.today, args);
     expect(state).toMatchObject({ totalRaisedCents: 1100, myGivenCents: 1000, watererCount: 2, answererCount: 2 });
-    expect(state?.fruits).toHaveLength(22);
+    expect(state?.fruits).toHaveLength(2);
+    expect(state?.lightBundles).toBe(22);
     for (const privateValue of [deviceId, friend, "whopPaymentId", "memberId", "userId"]) expect(JSON.stringify(state?.fruits)).not.toContain(privateValue);
   });
 
@@ -206,9 +209,11 @@ describe("closed impact and historical attribution", () => {
     const captured = await intent(t, tree, 5, friend);
     await t.mutation(internal.lanterns.applyPayment, payment(captured));
     let shared = await t.query(api.days.today, { deviceId, treeId: tree.treeId });
-    expect(shared?.fruits).toHaveLength(5);
-    expect(shared?.fruits.every(fruit => fruit.golden && fruit.milestone === 3 && !fruit.isMine)).toBe(true);
-    expect(shared?.wateringEvent).toBeNull();
+    expect(shared?.fruits).toHaveLength(1);
+    expect(shared?.fruits.every(fruit => !fruit.golden && !fruit.isMine)).toBe(true);
+    expect(shared?.lightBundles).toBe(5);
+    expect(shared?.goldenLightBundles).toBe(5);
+    expect(shared?.lightEvent).toBeNull();
     vi.setSystemTime(new Date("2026-11-16T12:00:00Z"));
     await t.mutation(internal.lifecycle.morning);
     const next = await t.query(api.days.today, { deviceId: friend, treeId: tree.treeId });
@@ -217,11 +222,15 @@ describe("closed impact and historical attribution", () => {
     const fourth = await intent(t, currentTree, 2, friend);
     await t.mutation(internal.lanterns.applyPayment, payment(fourth));
     shared = await t.query(api.days.today, { deviceId, treeId: tree.treeId });
-    expect(shared?.fruits.every(fruit => !fruit.golden && fruit.milestone === null)).toBe(true);
+    expect(shared?.fruits.every(fruit => !fruit.golden)).toBe(true);
+    expect(shared?.lightBundles).toBe(2);
+    expect(shared?.goldenLightBundles).toBe(0);
     const grove = await t.query(api.days.grove, { deviceId: friend, treeId: tree.treeId });
     const yesterday = grove.find(day => day.date === "2026-11-15");
-    expect(yesterday?.fruits).toHaveLength(5);
-    expect(yesterday?.fruits.every(fruit => fruit.golden && fruit.milestone === 3)).toBe(true);
+    expect(yesterday?.fruits).toHaveLength(1);
+    expect(yesterday?.fruits.every(fruit => !fruit.golden)).toBe(true);
+    expect(yesterday?.lightBundles).toBe(5);
+    expect(yesterday?.goldenLightBundles).toBe(5);
     expect((await t.query(api.streaks.summary, { deviceId: friend, treeId: tree.treeId })).giving.count).toBe(4);
   });
 
@@ -243,7 +252,8 @@ describe("closed impact and historical attribution", () => {
     expect(await t.run(ctx => ctx.db.get(first.wateringId))).toMatchObject({ dayId: tree.dayId, creditedDate: "2026-11-14", paidAt: paid.paidAt });
     let yesterday = await t.query(api.days.yesterday, { deviceId, treeId: tree.treeId });
     expect(yesterday).toMatchObject({ totalRaisedCents: 100, answererCount: 1, watererCount: 1, myGivenCents: 100 });
-    expect(yesterday?.fruits).toHaveLength(2);
+    expect(yesterday?.fruits).toHaveLength(1);
+    expect(yesterday?.lightBundles).toBe(2);
     expect((await t.query(api.days.today, { deviceId, treeId: tree.treeId }))?.totalRaisedCents).toBe(0);
     expect((await t.query(api.streaks.summary, { deviceId, treeId: tree.treeId })).giving).toMatchObject({ count: 1, status: "at_risk" });
     await t.mutation(internal.lanterns.applyPayment, payment(second, "pay_secondlate", Date.parse("2026-11-15T08:00:00Z")));
@@ -262,9 +272,10 @@ describe("closed impact and historical attribution", () => {
     const { paidAt: _, ...undated } = payment(captured, "pay_undatedcanonical");
     await t.mutation(internal.lanterns.applyPayment, undated);
     let today = await t.query(api.days.today, { deviceId, treeId: tree.treeId });
-    expect(today?.fruits).toHaveLength(2);
-    expect(today?.fruits[0].paidAt).toBeNull();
-    expect(today?.wateringEvent).toBeNull();
+    expect(today?.fruits).toHaveLength(1);
+    expect(today?.fruits[0]).not.toHaveProperty("paidAt");
+    expect(today?.lightBundles).toBe(2);
+    expect(today?.lightEvent).toBeNull();
     expect(today?.streaks.giving.count).toBe(1);
     vi.setSystemTime(new Date("2026-11-16T12:00:00Z"));
     await t.mutation(internal.lifecycle.morning);
@@ -274,7 +285,7 @@ describe("closed impact and historical attribution", () => {
     expect(await t.run(ctx => ctx.db.get(captured.wateringId))).toMatchObject({ dayId: tree.dayId, creditedDate: "2026-11-15", paidAt });
     expect((await t.run(ctx => ctx.db.get(captured.wateringId)))?.confirmedAt).toBeUndefined();
     today = await t.query(api.days.today, { deviceId, treeId: tree.treeId });
-    expect(today?.wateringEvent).toBeNull();
+    expect(today?.lightEvent).toBeNull();
     expect(today?.totalRaisedCents).toBe(0);
     expect(today?.streaks.giving).toMatchObject({ count: 1, status: "at_risk", totalCents: 100 });
     expect((await t.query(api.days.yesterday, { deviceId, treeId: tree.treeId }))?.totalRaisedCents).toBe(100);
@@ -297,8 +308,9 @@ describe("closed impact and historical attribution", () => {
     }
     const state = await t.query(api.days.today, { deviceId, treeId: tree.treeId });
     expect(state).toMatchObject({ totalRaisedCents: 275, watererCount: 1, myGivenCents: 275 });
-    expect(state?.fruits).toHaveLength(3);
-    expect(state?.wateringEvent).toBeNull();
+    expect(state?.fruits).toEqual([]);
+    expect(state?.lightBundles).toBe(3);
+    expect(state?.lightEvent).toBeNull();
     expect(await t.run(ctx => ctx.db.query("lanterns").collect())).toHaveLength(2);
   });
 });
@@ -311,9 +323,11 @@ describe("first-open impact and isolated40/12 demo", () => {
     expect(first).toMatchObject({ todayDayId: run.dayId, shouldShowYesterday: true, yesterday: {
       answererCount: 40, watererCount: 12, totalRaisedCents: 1200, myGivenCents: 100, isDemo: true, charity: sackCharity,
     } });
-    expect(first?.yesterday?.fruits).toHaveLength(24);
-    expect(first?.yesterday?.fruits.filter(fruit => fruit.isMine)).toHaveLength(2);
-    expect(first?.yesterday?.fruits.filter(fruit => fruit.isMine).every(fruit => fruit.golden)).toBe(true);
+    expect(first?.yesterday?.fruits).toHaveLength(40);
+    expect(first?.yesterday?.fruits.filter(fruit => fruit.isMine)).toHaveLength(1);
+    expect(first?.yesterday?.fruits.every(fruit => !fruit.golden)).toBe(true);
+    expect(first?.yesterday?.lightBundles).toBe(24);
+    expect(first?.yesterday?.goldenLightBundles).toBe(2);
     const other = await t.query(api.days.yesterday, { deviceId: friend, treeId: tree.treeId });
     expect(other).toMatchObject({ answererCount: 40, watererCount: 12, totalRaisedCents: 1200, myGivenCents: 0 });
     for (const value of [deviceId, friend, "Private", "text", "userId", "memberId", "whopPaymentId"]) expect(JSON.stringify(other)).not.toContain(value);
@@ -358,17 +372,19 @@ describe("first-open impact and isolated40/12 demo", () => {
     expect(repeated.wateringId).toBe(row.wateringId);
     await expect(t.mutation(api.waterings.demoWater, { ...input, bundles: 2 })).rejects.toThrow("different bundles");
     let state = await t.query(api.days.today, args);
-    expect(state?.fruits).toHaveLength(5);
+    expect(state?.fruits).toHaveLength(1);
+    expect(state?.lightBundles).toBe(5);
     expect(state?.streaks.giving).toMatchObject({ count: 4, status: "current", totalCents: 550 });
     expect(state?.totalRaisedCents).toBe(250);
     expect(state?.raisedCents).toBe(0);
-    expect(state?.wateringEvent?.fruitIds).toHaveLength(5);
+    expect(state?.lightEvent?.lightBundles).toBe(5);
     await t.mutation(api.waterings.demoWater, { ...input, bundles: 2, requestId: "demo-interaction-00002" });
-    expect((await t.query(api.days.today, args))?.fruits).toHaveLength(7);
+    expect((await t.query(api.days.today, args))?.fruits).toHaveLength(1);
+    expect((await t.query(api.days.today, args))?.lightBundles).toBe(7);
     await t.mutation(api.demo.restart, args);
     state = await t.query(api.days.today, args);
     expect(state?.fruits).toEqual([]);
-    expect(state?.wateringEvent).toBeNull();
+    expect(state?.lightEvent).toBeNull();
     expect(state?.streaks.giving.count).toBe(3);
     await expect(t.mutation(api.waterings.demoWater, input)).rejects.toThrow("not available");
     await t.mutation(api.demo.stop, args);
@@ -416,7 +432,8 @@ describe("canonical verification and bounded migration failures", () => {
     expect((await t.fetch("/whop/children", (await signed(childSecret)))).status).toBe(200);
     const state = await t.query(api.days.today, { deviceId, treeId: tree.treeId });
     expect(state).toMatchObject({ totalRaisedCents: 250, watererCount: 1 });
-    expect(state?.fruits).toHaveLength(5);
+    expect(state?.fruits).toHaveLength(1);
+    expect(state?.lightBundles).toBe(5);
     expect(await t.run(ctx => ctx.db.query("lanterns").collect())).toHaveLength(1);
   });
 
