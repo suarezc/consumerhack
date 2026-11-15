@@ -8,6 +8,9 @@
     "scheme": "storytime",
     "userInterfaceStyle": "light",
     "backgroundColor": "#0b1030",
+    "ios": {
+      "bundleIdentifier": "com.charlessuarez.storytime"
+    },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#0b1030",
@@ -36,6 +39,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "owner": "suarezc",
+    "extra": {
+      "eas": {
+        "projectId": "9c1d5974-abc5-4039-912c-7b79809cd460"
+      }
     }
   }
 }
