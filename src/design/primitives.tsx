@@ -62,7 +62,7 @@ export function StoryScreen({ children, scrollable = true, keyboardAvoiding = tr
   keyboardVerticalOffset = 0, edges = ['top', 'bottom', 'left', 'right'], style, contentStyle }: StoryScreenProps) {
   const { theme } = useStoryTime();
   const content = <View style={[styles.content, contentStyle]}>{children}</View>;
-  return <View style={[styles.screen, { backgroundColor: theme.skyTop }, style]}>
+  return <View style={[styles.screen, { backgroundColor: theme.skyTop, overflow: 'hidden' }, style]}>
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       {theme.skyBands.map((color, index) => <View key={index} style={{ flex: 1, backgroundColor: color }} />)}
     </View>
