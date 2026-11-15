@@ -1,4 +1,4 @@
-import { useConvex } from "convex/react";
+import { useConvex, useQuery } from "convex/react";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { AppState } from "react-native";
 
@@ -18,6 +18,8 @@ const NotificationContext = createContext<{
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const { session } = useSession();
   const deviceId = session?.deviceId;
+  const memberships = useQuery(api.trees.list, deviceId ? { deviceId } : "skip");
+  const hasMembership = memberships !== undefined && memberships.length > 0;
   const client = useConvex();
   const controller = useRef<ReturnType<typeof createNotificationService> | null>(null);
   const request = useRef(0);
@@ -26,7 +28,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [operation, setOperation] = useState<{ deviceId: string; busy: boolean; action: ReminderAction } | null>(null);
 
   useEffect(() => {
-    if (!deviceId) return;
+    if (!deviceId || !hasMembership) return;
     let active = true;
     const service = createNotificationService(notificationRuntime(), {
       preference: () => client.query(api.notifications.preference, { deviceId }),
@@ -56,7 +58,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       service.dispose();
       if (controller.current === service) controller.current = null;
     };
-  }, [client, deviceId]);
+  }, [client, deviceId, hasMembership]);
 
   async function update(action: ReminderAction) {
     const service = controller.current;

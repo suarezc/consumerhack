@@ -114,6 +114,7 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
     {canAnswer && <StoryButton label="Leave your answer" style={productSceneStyles.primary} onPress={() => { setError(""); setComposer(true); }} />}
     {today.myAnswer && !unlocked && <StoryText variant="caption" color={detailUnavailable ? theme.text : theme.paper}>Your answer is planted.</StoryText>}
     {!today.myAnswer && !canAnswer && <StoryText color={detailUnavailable ? theme.text : theme.paper}>{now < today.day.opensAt ? "The question opens soon." : "This day has closed. Come back for tomorrow’s question."}</StoryText>}
+    {today.tree.isHost && !today.myAnswer && !canAnswer && <StoryButton label={today.day.isDemo ? "Restart sample day" : "Start sample day"} tone="quiet" onPress={() => { setError(""); setDemoSettings(true); }} />}
     {today.myAnswer && <StoryButton label="Water today's tree for S.A.C.K." style={productSceneStyles.primary} onPress={() => setWateringOpen(true)} />}
     <TreeNavigation hill={!detailUnavailable} compact />
     {!!error && !composer && !selected && !settings && <StoryText color="#ffd27a" accessibilityRole="alert">{error}</StoryText>}
