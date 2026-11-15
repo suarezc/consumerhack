@@ -13,6 +13,22 @@ export type RitualTimelineProps = {
   onRestart: () => void;
 };
 
+export type TimelineWeather = 'clear' | 'rain' | 'snow';
+
+export function RitualWeather({ weather, onChange }: { weather: TimelineWeather; onChange: (weather: TimelineWeather) => void }) {
+  const { theme } = useStoryTime();
+  return <View role="group" accessibilityLabel="Preview weather" style={styles.weather}>
+    <StoryText variant="caption" color={theme.text}>Weather</StoryText>
+    <View style={styles.weatherChoices}>
+      {(['clear', 'rain', 'snow'] as const).map(value => <Pressable key={value} accessibilityRole="button"
+        accessibilityLabel={`${value[0].toUpperCase()}${value.slice(1)} weather`} accessibilityState={{ selected: value === weather }}
+        aria-pressed={value === weather} onPress={() => onChange(value)} style={[styles.weatherChoice, { borderColor: value === weather ? theme.text : 'transparent' }]}>
+        <StoryText variant={value === weather ? 'control' : 'caption'} color={theme.text} style={styles.actionLabel}>{value[0].toUpperCase()}{value.slice(1)}</StoryText>
+      </Pressable>)}
+    </View>
+  </View>;
+}
+
 const stages = [
   { label: 'Seed', at: 0 },
   { label: 'Sapling', at: 0.25 },
@@ -64,6 +80,9 @@ const styles = StyleSheet.create({
   trackHit: { height: 24, justifyContent: 'center' },
   track: { position: 'absolute', left: 0, right: 0, height: 2, borderRadius: 2 },
   thumb: { position: 'absolute', width: 10, height: 10, borderRadius: 5, marginLeft: -5 },
-  stages: { flexDirection: 'row', justifyContent: 'space-between' },
-  stage: { minHeight: 44, justifyContent: 'center', minWidth: 44 },
+  stages: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', columnGap: 8 },
+  stage: { minHeight: 44, justifyContent: 'center', minWidth: 44, maxWidth: '100%' },
+  weather: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' },
+  weatherChoices: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  weatherChoice: { minHeight: 44, minWidth: 44, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 1 },
 });
