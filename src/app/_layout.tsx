@@ -1,5 +1,8 @@
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { Stack } from "expo-router";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+
+import { SessionProvider } from "@/providers/SessionProvider";
 
 const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
   unsavedChangesWarning: false,
@@ -8,7 +11,11 @@ const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
 export default function RootLayout() {
   return (
     <ConvexProvider client={convex}>
-      <Stack screenOptions={{ headerShown: false }} />
+      <SafeAreaProvider>
+        <SessionProvider>
+          <Stack screenOptions={{ headerShown: false }} />
+        </SessionProvider>
+      </SafeAreaProvider>
     </ConvexProvider>
   );
 }
