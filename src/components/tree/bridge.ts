@@ -1,4 +1,5 @@
 import type { TreeProps } from "./types";
+import { normalizeFruits, normalizeWateringEvent } from "./fruit";
 
 const count = (value: number, max: number) =>
   Number.isFinite(value) ? Math.min(max, Math.max(0, Math.floor(value))) : 0;
@@ -33,6 +34,8 @@ export function normalizeTreeState(props: TreeProps) {
           }))
       : [],
     lanterns: count(props.lanterns, 64),
+    fruits: normalizeFruits(props.fruits),
+    wateringEvent: normalizeWateringEvent(props.wateringEvent),
   };
 }
 
