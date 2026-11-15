@@ -10,8 +10,9 @@ export const today = query({
     const tree = await ctx.db.get(treeId);
     if (!tree) return null;
     const day = tree.demoDayId ? await ctx.db.get(tree.demoDayId) : await ctx.db.query("days")
-      .withIndex("by_tree_date", q => q.eq("treeId", treeId).eq("date", ritualWindow(Date.now()).date)).unique();
-    if (!day) return null;
+      .withIndex("by_tree_date", q => q.eq("treeId", treeId)).order("desc")
+      .filter(q => q.neq(q.field("isDemo"), true)).first();
+    if (!day || (!day.isDemo && day.date !== ritualWindow(Date.now()).date)) return null;
     const members = (await ctx.db.query("members").withIndex("by_tree", q => q.eq("treeId", treeId)).collect())
       .filter(m => day.isDemo || !m.isDemo);
     const allAnswers = await ctx.db.query("answers").withIndex("by_day", q => q.eq("dayId", day._id)).collect();

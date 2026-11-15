@@ -62,6 +62,33 @@ describe("membership and daily scheduling", () => {
     expect(JSON.stringify(list)).not.toContain(host);
     expect(JSON.stringify(await t.query(api.days.today, { treeId, deviceId: host }))).not.toContain(friend);
   });
+
+  it("keeps the Today index dependency open to the next morning insertion", async () => {
+    const { t, treeId, dayId } = await fixture(1);
+    const sources: { indexName?: string; range?: { type: string; fieldPath: string; value: unknown }[]; order?: string }[] = [];
+    const initial = await t.query(async ctx => {
+      const runtime = (globalThis as unknown as { Convex: { syscall: unknown } }).Convex;
+      const original = runtime.syscall as (name: string, args: string) => string;
+      const spy = vi.spyOn(runtime, "syscall", "get").mockReturnValue((name: string, args: string) => {
+        if (name === "1.0/queryStream") sources.push(JSON.parse(args).query.source);
+        return original(name, args);
+      });
+      try {
+        return await ctx.runQuery(api.days.today, { deviceId: host, treeId });
+      } finally {
+        spy.mockRestore();
+      }
+    });
+    expect(initial?.day.dayId).toBe(dayId);
+    const dayRead = sources.find(source => source.indexName === "days.by_tree_date");
+    expect(dayRead).toMatchObject({ order: "desc", range: [{ type: "Eq", fieldPath: "treeId", value: treeId }] });
+    expect(dayRead?.range).toHaveLength(1);
+    vi.setSystemTime(new Date("2026-11-16T06:00:00Z"));
+    await t.mutation(internal.lifecycle.morning);
+    const next = await t.query(api.days.today, { deviceId: host, treeId });
+    expect(next?.day.dayId).not.toBe(dayId);
+    expect(next?.day.date).toBe("2026-11-16");
+  });
 });
 
 describe("answers, bloom and privacy", () => {
@@ -148,6 +175,16 @@ describe("answers, bloom and privacy", () => {
     expect(await t.query(api.days.grove, { treeId, deviceId: host })).toMatchObject([{ answered: true, blossom: 0 }]);
     expect(await t.query(api.days.grove, { treeId, deviceId: friend })).toMatchObject([{ answered: false, blossom: null }]);
     expect(JSON.stringify(await t.query(api.days.grove, { treeId, deviceId: friend }))).not.toContain("Yesterday");
+  });
+
+  it("counts only paid lantern records without changing payment state", async () => {
+    const { t, treeId, memberId } = await fixture();
+    await t.run(async ctx => {
+      await ctx.db.insert("lanterns", { treeId, memberId, amountCents: 500, status: "paid", whopCheckoutId: "paid-test", createdAt: Date.now() });
+      await ctx.db.insert("lanterns", { treeId, memberId, amountCents: 900, status: "pending", whopCheckoutId: "pending-test", createdAt: Date.now() });
+    });
+    expect(await t.query(api.days.today, { treeId, deviceId: host })).toMatchObject({ lanternCount: 1, raisedCents: 500 });
+    expect((await t.run(ctx => ctx.db.query("lanterns").collect())).map(l => l.status).sort()).toEqual(["paid", "pending"]);
   });
 });
 
