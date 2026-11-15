@@ -28,6 +28,8 @@ When using the platform cloud-build tool instead of the CLI, archive the applica
 
 Use at least three distinct identities and two trees. Give each test its actions, observed result, evidence, and pass/fail/untested status. A visible UI restriction does not establish server-side privacy: also exercise the underlying query with an ineligible identity.
 
+The final integrated binary must include the latest merged Tree bridge revision, including its hello/BFCache lifecycle updates. Older native harness evidence does not cover later bridge changes. Verify a reference-faithful, full-bleed scene rather than a padded or scrimmed wrapper, blossom taps opening the right answer card, and card dismissal. Screens must key the Tree instance by `treeId:dayId`; exercise a same-count/same-time day switch and demo replay to catch stale selection or bridge state. Visual bloom is clock-driven between `timeOfDay` 0.79 and 0.95; backend access checks remain authoritative, including early everyone-answered bloom.
+
 | Area | Required observations |
 | --- | --- |
 | Membership | Create one tree, join it by its six-character code from a second identity, reject invalid codes, and restore the selected tree after app termination/relaunch. |
