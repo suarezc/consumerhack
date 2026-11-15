@@ -1,5 +1,7 @@
 # Offline typography
 
+The isolated warm-typography successor now uses Alegreya + Source Sans3; see [WARM-TYPOGRAPHY.md](WARM-TYPOGRAPHY.md) for exact files, licenses, roles and hashes. The Newsreader/Plex record below belongs to the earlier frozen native/product checkpoint and its binaries remain retained, not loaded by the successor.
+
 These are complete, unmodified static TrueType faces, bundled locally so font loading never needs a network request. File names were shortened; the font binaries were not changed or subsetted.
 
 | Local file | Face | Upstream file |
