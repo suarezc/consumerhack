@@ -15,7 +15,7 @@ export function TodayStreaks({ summary, color }: TodayStreaksProps) {
   return <View style={[styles.group, styles.today]}>
     {summary.isDemo && <StoryText variant="meta" color={ink}>Demo · sample days</StoryText>}
     <View style={styles.streakRow}>
-      {(['answer', 'giving'] as const).map((kind) => {
+      {(['giving', 'answer'] as const).map((kind) => {
         const copy = streakCopy(summary[kind], kind);
         return <View key={kind} style={styles.streak}>
           <View style={styles.inline}>

@@ -1,5 +1,7 @@
 # Quiet streak and personal Grove integration
 
+The charity-day presentation extension, exact bundle controls, and newer frozen DTO semantics are documented in `charity.md`. Giving is the primary Today indicator; answer history remains secondary. ViewerFruit.paidAt now accepts number or null without discarding supplied historical fruit.
+
 These exports extend the visual kit. They do not derive streaks, schedule notifications, create checkouts, or own a data provider. The frozen backend contract is `handoffs/CONS-11/api.md` in project Drive. Use the server's 06:00 UTC ritual clock; no local/midnight arithmetic belongs here.
 
 ## Summary and Grove
