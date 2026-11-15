@@ -21,10 +21,13 @@ import type * as lib_judgeAdapter from "../lib/judgeAdapter.js";
 import type * as lib_judgeFixtures from "../lib/judgeFixtures.js";
 import type * as lib_judgeLogic from "../lib/judgeLogic.js";
 import type * as lib_payments from "../lib/payments.js";
+import type * as lib_streakLogic from "../lib/streakLogic.js";
 import type * as lifecycle from "../lifecycle.js";
 import type * as notes from "../notes.js";
 import type * as questions from "../questions.js";
+import type * as streaks from "../streaks.js";
 import type * as trees from "../trees.js";
+import type * as waterings from "../waterings.js";
 
 import type {
   ApiFromModules,
@@ -46,10 +49,13 @@ declare const fullApi: ApiFromModules<{
   "lib/judgeFixtures": typeof lib_judgeFixtures;
   "lib/judgeLogic": typeof lib_judgeLogic;
   "lib/payments": typeof lib_payments;
+  "lib/streakLogic": typeof lib_streakLogic;
   lifecycle: typeof lifecycle;
   notes: typeof notes;
   questions: typeof questions;
+  streaks: typeof streaks;
   trees: typeof trees;
+  waterings: typeof waterings;
 }>;
 
 /**
