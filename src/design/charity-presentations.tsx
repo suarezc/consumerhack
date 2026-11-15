@@ -86,7 +86,7 @@ export function WateringBundles({ selectedBundles, onSelectBundles, onWater, can
         </Pressable>;
       })}
     </View>
-    <StoryText variant="caption" color={theme.paper}>Each paid bundle adds one fruit. $0.50 per bundle.</StoryText>
+    <StoryText variant="caption" color={theme.paper}>Each paid bundle adds a firefly and a fairy light. $0.50 per bundle.</StoryText>
     {!canWater && <StoryText nativeID={`${id}-locked`} variant="caption" color={theme.paper}>Answer today’s question to water the tree.</StoryText>}
     {!!error && <StoryText nativeID={`${id}-error`} accessibilityRole="alert" variant="caption" color={theme.paper}>{error}</StoryText>}
     <StoryButton label="Water today's tree for S.A.C.K." loading={loading} disabled={disabled || !validSelection}
