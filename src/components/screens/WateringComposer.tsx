@@ -1,22 +1,24 @@
-import { useAction } from "convex/react";
+import { useAction, useMutation } from "convex/react";
+import { randomUUID } from "expo-crypto";
 import * as WebBrowser from "expo-web-browser";
 import { useRef, useState } from "react";
 
 import { Panel } from "@/components/screens/Scene";
-import { StoryButton, StoryField, StoryText } from "@/design";
+import { StoryButton, StoryText, WateringBundles } from "@/design";
+import type { Today } from "@/providers/RitualProvider";
 import { useSession } from "@/providers/SessionProvider";
-import { api, type Id } from "@/services/api";
-import { amountInCents } from "@/services/ritual";
+import { api } from "@/services/api";
+import { createDemoWateringIntent } from "@/services/watering";
 
-export function WateringComposer({ treeId, answerId, cause, onClose }: {
-  treeId: Id<"trees">;
-  answerId?: Id<"answers">;
-  cause: string;
+export function WateringComposer({ today, onClose }: {
+  today: Today;
   onClose: () => void;
 }) {
   const { session } = useSession();
   const checkout = useAction(api.waterings.checkout);
-  const [amount, setAmount] = useState("1");
+  const demoWater = useMutation(api.waterings.demoWater);
+  const [bundles, setBundles] = useState<2 | 5 | 10>(2);
+  const [demoRequest] = useState(() => createDemoWateringIntent(randomUUID));
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
@@ -24,40 +26,43 @@ export function WateringComposer({ treeId, answerId, cause, onClose }: {
   const [opened, setOpened] = useState(false);
 
   async function prepare() {
-    if (!session || pending.current) return;
-    const amountCents = amountInCents(amount);
-    if (amountCents === null) {
-      setError("Choose $1 to $100 USD in $0.50 steps. Your amount has not been changed.");
-      return;
-    }
+    if (!session || !today.myAnswer || pending.current) return;
     pending.current = true;
     setBusy(true);
     setError("");
     try {
-      const result = await checkout({ deviceId: session.deviceId, treeId, ...(answerId ? { answerId } : {}), amountCents });
-      setCheckoutUrl(result.checkoutUrl);
+      const target = { deviceId: session.deviceId, treeId: today.tree.treeId, dayId: today.day.dayId, bundles };
+      if (today.day.isDemo) {
+        await demoWater({ ...target, requestId: demoRequest.forBundles(bundles).requestId });
+        demoRequest.reset();
+        onClose();
+      } else {
+        const result = await checkout({ ...target, answerId: today.myAnswer.answerId });
+        setCheckoutUrl(result.checkoutUrl);
+      }
     } catch {
-      setError("Sandbox checkout isn’t available. No watering has been marked paid. Please try again later.");
+      setError(today.day.isDemo ? "The sample watering wasn’t confirmed. Retry this choice to safely check the same request." : "Sandbox checkout isn’t available. No payment success has been confirmed. Please try again later.");
     } finally {
       setBusy(false);
       pending.current = false;
     }
   }
 
-  return <Panel title="A little light for a cause." onClose={() => { if (!busy) onClose(); }}>
-    <StoryText color="#f6efe6">{cause}</StoryText>
-    <StoryText variant="caption" color="#ffd27a">Watering · sandbox checkout · test payments only</StoryText>
-    <StoryText variant="caption" color="#c6c1c2">$1 minimum, then $0.50 steps. Your chosen amount is never increased automatically.</StoryText>
-    {!checkoutUrl && <>
-      <StoryField labelColor="#f6efe6" errorColor="#ffd27a" label="Amount in USD" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" inputMode="decimal" maxLength={6} editable={!busy} />
-      <StoryButton label="Prepare sandbox checkout" loading={busy} onPress={() => { void prepare(); }} />
-    </>}
+  return <Panel title="A little care, together." onClose={() => { if (!busy) onClose(); }}>
+    <StoryText color="#f6efe6">{today.charity.name}</StoryText>
+    <StoryText variant="caption" color="#ffd27a">{today.day.isDemo ? "Demo · sample money · no charge" : "Sandbox checkout · test payments only · no real donation or payout is established"}</StoryText>
+    {!checkoutUrl && <WateringBundles selected={bundles} onSelect={(next) => {
+      if (pending.current) return;
+      setBundles(next);
+      if (next !== bundles) demoRequest.reset();
+      setError("");
+    }} onWater={() => { void prepare(); }} canWater={today.myAnswer !== null} loading={busy} error={error} />}
     {checkoutUrl && <StoryButton label="Open secure sandbox checkout" loading={busy} onPress={() => {
       setBusy(true);
       setError("");
       void WebBrowser.openBrowserAsync(checkoutUrl).then(() => setOpened(true)).catch(() => setError("The browser couldn’t open. Please try the checkout button again.")).finally(() => setBusy(false));
     }} />}
     <StoryText variant="caption" color="#c6c1c2">{opened ? "Checkout was opened. " : ""}Closing checkout never adds fruit or extends a streak. The tree reacts only after the payment service verifies the watering.</StoryText>
-    {!!error && <StoryText color="#ffd27a" accessibilityRole="alert">{error}</StoryText>}
+    {!!checkoutUrl && !!error && <StoryText color="#ffd27a" accessibilityRole="alert">{error}</StoryText>}
   </Panel>;
 }
