@@ -74,6 +74,8 @@ export const summary = query({
   args: { deviceId: v.string(), treeId: v.id("trees") },
   handler: async (ctx, { deviceId, treeId }) => {
     await requireMember(ctx, treeId, deviceId);
+    await ctx.db.query("days").withIndex("by_tree_date", q => q.eq("treeId", treeId)).order("desc")
+      .filter(q => q.neq(q.field("isDemo"), true)).first();
     return await userSummary(ctx, deviceId, await contributionScope(ctx, treeId));
   },
 });

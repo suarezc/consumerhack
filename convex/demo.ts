@@ -4,6 +4,8 @@ import { internalMutation, mutation } from "./_generated/server";
 import { requireHost } from "./access";
 import { insertAnswer } from "./answers";
 import { ensureDay } from "./lifecycle";
+import { questionFor, ritualWindow } from "./questions";
+import { DAY_MS, shiftDate } from "./lib/streakLogic";
 
 const samples = [
   { name: "Maya", text: "A friend saved me a seat without being asked." },
@@ -15,10 +17,25 @@ export const restart = mutation({
   args: { deviceId: v.string(), treeId: v.id("trees") },
   handler: async (ctx, { deviceId, treeId }) => {
     await requireHost(ctx, treeId, deviceId);
+    const host = await ctx.db.query("members").withIndex("by_tree_device", q => q.eq("treeId", treeId).eq("deviceId", deviceId)).unique();
     const opensAt = Date.now();
     const bloomAt = opensAt + 60_000;
-    const dayId = await ctx.db.insert("days", { treeId, date: `demo:${opensAt}`, question: "What small thing made today feel a little softer?", opensAt, bloomAt, isDemo: true });
+    const ritualDate = ritualWindow(opensAt).date;
+    const dayId = await ctx.db.insert("days", { treeId, date: `demo:${opensAt}`, ritualDate, question: "What small thing made today feel a little softer?", opensAt, bloomAt, isDemo: true });
+    await ctx.db.patch(dayId, { demoRunId: dayId });
     await ctx.db.patch(treeId, { demoDayId: dayId });
+    for (let offset = -3; offset < 0; offset++) {
+      const date = shiftDate(ritualDate, offset);
+      const start = Date.parse(`${date}T06:00:00Z`);
+      const historyId = await ctx.db.insert("days", { treeId, date: `demo:${dayId}:${date}`, ritualDate: date,
+        question: questionFor(date), opensAt: start, bloomAt: start + 15 * 60 * 60 * 1000,
+        bloomedAt: start + 15 * 60 * 60 * 1000, isDemo: true, demoRunId: dayId });
+      await ctx.db.insert("answers", { dayId: historyId, treeId, memberId: host!._id,
+        text: samples[offset + 3].text, blossom: 0, createdAt: start + DAY_MS / 4 });
+      await ctx.db.insert("lanterns", { treeId, memberId: host!._id, amountCents: 50, status: "paid",
+        whopCheckoutId: `demo:${dayId}:${date}`, createdAt: start + DAY_MS / 4,
+        paidAt: start + DAY_MS / 4, creditedDate: date, source: "demo", demoRunId: dayId });
+    }
     for (let index = 0; index < samples.length; index++) {
       const sample = samples[index];
       const sampleDevice = `$demo:${treeId}:${index}`;
