@@ -103,6 +103,25 @@ describe("explicit notification consent", () => {
     expect(f.preference().registered).toBe(false);
   });
 
+  it("serializes token/foreground refresh without canceling explicit opt-in", async () => {
+    const f = fixture();
+    let resolve!: (token: string) => void;
+    let started!: () => void;
+    const waiting = new Promise<void>((done) => { started = done; });
+    f.permission("granted");
+    f.runtime.token = () => { started(); return new Promise<string>((done) => { resolve = done; }); };
+    const service = createNotificationService(f.runtime, f.backend);
+    const registration = service.optIn();
+    await waiting;
+    const refresh = service.reconcile();
+    f.runtime.token = async () => "ExpoPushToken[refreshed_test_token]";
+    resolve("ExpoPushToken[first_test_token]");
+    expect(await registration).toEqual({ state: "registered", optIn: true });
+    expect(await refresh).toEqual({ state: "registered", optIn: true });
+    expect(f.preference().optIn).toBe(true);
+    expect(f.updates).toHaveLength(2);
+  });
+
   it("times out native token acquisition and clears stale server registration", async () => {
     vi.useFakeTimers();
     try {
