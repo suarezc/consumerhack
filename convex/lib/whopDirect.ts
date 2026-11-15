@@ -2,7 +2,7 @@ import { WhopClient, WhopEnvironment } from "@whop/sdk";
 import { paymentEvent, requireSandbox, sandboxCheckoutUrl, WHOP_API_VERSION } from "./payments";
 
 export const EXAMPLE_CAUSE_EXTERNAL_ID = "cause_sack";
-export const DIRECT_WATERING_INTEGRATION = "storytime-watering-direct-sandbox-v1";
+export const DIRECT_WATERING_INTEGRATION = "storytime-watering-sandbox-v2";
 export const CHILD_WEBHOOK_URL = "https://gallant-warbler-923.convex.site/whop/children";
 
 export function sandboxDirectClient() {
