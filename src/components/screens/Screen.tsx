@@ -8,7 +8,7 @@ import { useRitual } from "@/providers/RitualProvider";
 import { useSession } from "@/providers/SessionProvider";
 
 export function Screen({ title, children }: { title: string; children: ReactNode }) {
-  return <StoryScreen><StoryText variant="question" accessibilityRole="header">{title}</StoryText>{children}</StoryScreen>;
+  return <View nativeID="story-secondary-safe-area" style={{ flex: 1 }}><StoryScreen><StoryText variant="question" accessibilityRole="header">{title}</StoryText>{children}</StoryScreen></View>;
 }
 
 export function SessionGate({ children, requireTree = false }: { children: ReactNode; requireTree?: boolean }) {
