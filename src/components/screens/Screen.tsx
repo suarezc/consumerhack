@@ -34,10 +34,11 @@ function FirstOpenGate({ children }: { children: ReactNode }) {
   return children;
 }
 
-export function TreeNavigation({ hill = false }: { hill?: boolean }) {
+export function TreeNavigation({ hill = false, compact = false }: { hill?: boolean; compact?: boolean }) {
   const { theme } = useStoryTime();
+  const routes = compact ? [['Grove', '/grove']] as const : [['Today', '/today'], ['Bloom', '/bloom'], ['Kindred', '/kindred'], ['Grove', '/grove']] as const;
   return <View style={sceneStyles.row}>
-    {([['Today', '/today'], ['Bloom', '/bloom'], ['Kindred', '/kindred'], ['Grove', '/grove']] as const).map(([label, route]) =>
+    {routes.map(([label, route]) =>
       <Pressable key={route} accessibilityRole="button" onPress={() => router.replace(route)} style={{ minHeight: 48, justifyContent: "center", paddingHorizontal: 8 }}><StoryText variant="meta" color={hill ? theme.paper : theme.text}>{label}</StoryText></Pressable>)}
   </View>;
 }
