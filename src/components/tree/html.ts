@@ -339,13 +339,7 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
   const bloomAt = (v) => smooth((v - 0.79) / 0.16);
   const nightAt = (v) => smooth((v - 0.72) / 0.18);
   const answersAt = () => answerCount;
-  function growth(v) {
-    if (!answerCount) return 0.07;
-    let needed = 0;
-    for (let i = 0; i < answerCount; i++)
-      needed = Math.max(needed, tree.buds[i].node.dist + tree.buds[i].node.len);
-    return Math.max(0.07 + 0.93 * smooth(v / 0.78), needed / tree.maxDist);
-  }
+  const growth = (v) => 0.07 + 0.93 * smooth(v / 0.78);
 
   const leafBuf = [[], [], []];
 
@@ -1018,6 +1012,18 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
   function visibilityChanged() {
     refresh();
   }
+  function pageHide(event) {
+    if (!event.persisted) {
+      dispose();
+      return;
+    }
+    if (raf !== null) cancelAnimationFrame(raf);
+    raf = null;
+    lastTs = lastPaint = 0;
+  }
+  function pageShow(event) {
+    if (event.persisted) refresh();
+  }
   function frame(ts) {
     raf = null;
     if (disposed || !active || document.hidden || still) return;
@@ -1047,7 +1053,8 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
     cv.removeEventListener("pointerup", pointerUp);
     cv.removeEventListener("pointercancel", pointerCancel);
     cv.removeEventListener("lostpointercapture", pointerCancel);
-    window.removeEventListener("pagehide", dispose);
+    window.removeEventListener("pagehide", pageHide);
+    window.removeEventListener("pageshow", pageShow);
     clearTransient();
   }
   const observer = new ResizeObserver(resize);
@@ -1062,7 +1069,8 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
   cv.addEventListener("pointerup", pointerUp);
   cv.addEventListener("pointercancel", pointerCancel);
   cv.addEventListener("lostpointercapture", pointerCancel);
-  window.addEventListener("pagehide", dispose);
+  window.addEventListener("pagehide", pageHide);
+  window.addEventListener("pageshow", pageShow);
   resize();
   send({ type: "ready" });
 })();
