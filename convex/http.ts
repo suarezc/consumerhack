@@ -5,11 +5,9 @@ import { paymentEvent } from "./lib/payments";
 
 const http = httpRouter();
 
-http.route({
-  path: "/whop",
-  method: "POST",
-  handler: httpAction(async (ctx, request) => {
-    const secret = process.env.WHOP_WEBHOOK_SECRET;
+function webhookHandler(child: boolean) {
+  return httpAction(async (ctx, request) => {
+    const secret = child ? process.env.WHOP_CHILD_WEBHOOK_SECRET : process.env.WHOP_WEBHOOK_SECRET;
     if (process.env.WHOP_ENVIRONMENT !== "sandbox" || !secret || !process.env.WHOP_API_KEY) {
       return new Response("Sandbox payment verification is not configured", { status: 503 });
     }
@@ -23,12 +21,15 @@ http.route({
     }
     if (!event) return new Response("OK");
     try {
-      await ctx.runAction(internal.lanterns.receivePayment, event);
+      await ctx.runAction(internal.lanterns.receivePayment, child ? { ...event, child: true } : event);
     } catch {
       return new Response("Payment could not be verified", { status: 503 });
     }
     return new Response("OK");
-  }),
-});
+  });
+}
+
+http.route({ path: "/whop", method: "POST", handler: webhookHandler(false) });
+http.route({ path: "/whop/children", method: "POST", handler: webhookHandler(true) });
 
 export default http;

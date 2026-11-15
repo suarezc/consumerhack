@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>StoryTime personal blossom</title>
+  <path fill="#0b1030" d="M0 0H64V64H0Z"/>
+  <path d="M27 57Q36 45 32 31" fill="none" stroke="#c7b4bc" stroke-width="3" stroke-linecap="round"/>
+  <path d="M30 44Q16 43 18 35Q29 33 30 44" fill="#35586a"/>
+  <g transform="translate(33 27) scale(.72)">
+    <path d="M0-3C-18-13-13-30-3-27C2-26 4-19 4-12C11-29 28-23 24-12C23-7 17-4 10-3C29-2 30 16 17 17C12 17 7 12 4 7C10 25-6 32-12 21C-15 16-12 9-8 4C-25 15-36 1-26-7C-21-11-13-8-5-4Z" fill="#ffd27a"/>
+    <circle r="3.6" fill="#ab7247"/>
+  </g>
+</svg>
