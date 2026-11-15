@@ -7,3 +7,5 @@ export {
 } from './primitives';
 export { OnboardingIntro, GroveThumbnail, type OnboardingIntroProps, type GroveThumbnailProps } from './presentations';
 export { AnswerCard, type AnswerCardProps, type StoryAnswer, type BlossomOrigin } from './AnswerCard';
+export { TodayStreaks, GroveGivingSummary, GivingFeedback, type TodayStreaksProps, type GroveGivingSummaryProps, type GivingFeedbackProps } from './streaks';
+export type { RitualSummary, StreakState, StreakStatus, ViewerFruit, ConfirmedGivingEvent } from './ritual';
