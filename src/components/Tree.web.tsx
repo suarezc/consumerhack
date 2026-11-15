@@ -10,12 +10,11 @@ export type { TreeNote, TreeProps } from "./tree/types";
 const source = TREE_HTML.replace(
   "<script>",
   `<script>
-  const parentOrigin = new URL(document.referrer).origin;
   window.addEventListener('message', function (event) {
-    if (event.source !== window.parent || event.origin !== parentOrigin) event.stopImmediatePropagation();
+    if (event.source !== window.parent) event.stopImmediatePropagation();
   }, true);
   window.ReactNativeWebView = {
-    postMessage: function (data) { window.parent.postMessage(data, parentOrigin); }
+    postMessage: function (data) { window.parent.postMessage(data, '*'); }
   };
 </script><script>`,
 );
@@ -101,7 +100,6 @@ export function Tree(props: TreeProps) {
         srcDoc={source}
         onLoad={requestReady}
         sandbox="allow-scripts"
-        referrerPolicy="origin"
         style={{
           position: "absolute",
           inset: 0,
