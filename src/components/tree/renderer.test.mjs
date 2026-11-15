@@ -2,6 +2,23 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
+import ts from "typescript";
+
+function load(name, dependencies = {}) {
+  const source = readFileSync(new URL(`./${name}.ts`, import.meta.url), "utf8");
+  const code = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS },
+  }).outputText;
+  const context = { exports: {}, require: (id) => dependencies[id] };
+  vm.runInNewContext(code, context);
+  return context.exports;
+}
+const limits = load("limits");
+const fruit = load("fruit", { "./limits": limits });
+const { serializeTreeState } = load("bridge", {
+  "./fruit": fruit,
+  "./limits": limits,
+});
 
 const reference = readFileSync(
   new URL("../../../design/tree.html", import.meta.url),
@@ -18,10 +35,10 @@ const fruitRuntime = readFileSync(
   new URL("./fruitRuntime.ts", import.meta.url),
   "utf8",
 ).match(/String.raw`([\s\S]*)`;/)[1];
-const html = readFileSync(
-  new URL("./html.ts", import.meta.url),
-  "utf8",
-).replace("${FRUIT_RUNTIME}", fruitRuntime);
+const html = readFileSync(new URL("./html.ts", import.meta.url), "utf8")
+  .replace("${FRUIT_RUNTIME}", fruitRuntime)
+  .replaceAll("${TREE_MAX_STATE_LENGTH}", String(limits.TREE_MAX_STATE_LENGTH))
+  .replaceAll("${TREE_MAX_FRUITS}", String(limits.TREE_MAX_FRUITS));
 
 function renderer(reducedMotion = true) {
   const messages = [];
@@ -31,13 +48,20 @@ function renderer(reducedMotion = true) {
   let now = timestamp;
   const receivers = new Map();
   const gradient = { addColorStop() {} };
+  let paintedFruits = 0;
   const context = new Proxy(
     {},
     {
-      get: (_, key) =>
-        key === "createLinearGradient" || key === "createRadialGradient"
-          ? () => gradient
-          : () => {},
+      get: (target, key) =>
+        key in target
+          ? target[key]
+          : key === "fill"
+            ? () => {
+                if (target.fillStyle === "#d78c78") paintedFruits++;
+              }
+            : key === "createLinearGradient" || key === "createRadialGradient"
+              ? () => gradient
+              : () => {},
     },
   );
   const canvas = () => ({
@@ -55,6 +79,10 @@ function renderer(reducedMotion = true) {
     removeEventListener() {},
   };
   const window = {
+    paintedFruits: () => paintedFruits,
+    resetPaintedFruits: () => {
+      paintedFruits = 0;
+    },
     devicePixelRatio: 2,
     matchMedia: () => media,
     ReactNativeWebView: {
@@ -74,7 +102,7 @@ function renderer(reducedMotion = true) {
     "  const observer = new ResizeObserver(resize);",
     `let paints = 0;
     const originalRender = render;
-    render = function () { paints++; originalRender(); };
+    render = function () { paints++; window.resetPaintedFruits(); originalRender(); };
     window.inspect = function () {
       const branches = [];
       (function walk(node) {
@@ -82,7 +110,7 @@ function renderer(reducedMotion = true) {
         branches.push([node.depth, node.f, (node.ex - baseX) / U, (node.ey - groundY - 3) / U]);
         node.kids.forEach(walk);
       })(tree.root);
-      return { growth: growth(t), branches: branches, shown: tree.buds.slice(0, answerCount).filter(b => b.shown).length, open: tree.buds.slice(0, answerCount).filter(b => b.shown && b.open > .5).length, lanterns: lanternCount, threads: threads.length, revision: revision, paintedRevision: paintedRevision, paints: paints, time: t, clock: clockT, motes: motes.length, moteAges: motes.map(m => clockT - m.t0), bloom: bloom };
+      return { growth: growth(t), branches: branches, shown: tree.buds.slice(0, answerCount).filter(b => b.shown).length, open: tree.buds.slice(0, answerCount).filter(b => b.shown && b.open > .5).length, lanterns: lanternCount, threads: threads.length, revision: revision, paintedRevision: paintedRevision, paints: paints, time: t, clock: clockT, motes: motes.length, moteAges: motes.map(m => clockT - m.t0), bloom: bloom, paintedFruits: window.paintedFruits() };
     };
     const observer = new ResizeObserver(resize);`,
   );
@@ -135,6 +163,11 @@ function renderer(reducedMotion = true) {
     return paint ? flush() : inspect();
   };
   return Object.assign(update, {
+    session: messages[0].session,
+    receive: (data) => {
+      receivers.get("message")({ data });
+      return flush();
+    },
     flush,
     inspect,
     elapse: (elapsed) => {
@@ -142,6 +175,122 @@ function renderer(reducedMotion = true) {
     },
   });
 }
+
+test("the complete escaped-ID capacity applies atomically and overflow recovers", () => {
+  const update = renderer();
+  const alphabet = [
+    ...Array(8).keys(),
+    ...Array.from({ length: 8 }, (_, i) => i + 14),
+  ];
+  const paid = Array.from({ length: limits.TREE_MAX_FRUITS }, (_, i) => ({
+    id:
+      "\u0000".repeat(252) +
+      [0, 4, 8, 12]
+        .map((shift) => String.fromCharCode(alphabet[(i >>> shift) & 15]))
+        .join(""),
+    golden: false,
+    mine: false,
+  }));
+  const props = {
+    timeOfDay: 1,
+    answers: 1000,
+    mine: Array.from({ length: 1000 }, (_, i) => i),
+    notes: Array.from({ length: 512 }, () => ({
+      from: 999,
+      to: 998,
+      count: 32,
+      own: false,
+    })),
+    lanterns: 64,
+    fruits: paid,
+    wateringEvent: {
+      id: "\u0000".repeat(256),
+      fruitId: paid[0].id,
+      fruitIds: paid.map((x) => x.id),
+      revision: 1,
+    },
+  };
+  const data = serializeTreeState(props, update.session, 1, true, true);
+  assert.equal(typeof data, "string");
+  assert.ok(data.length > 30000000);
+  assert.ok(data.length <= limits.TREE_MAX_STATE_LENGTH);
+  const applied = update.receive(data);
+  assert.equal(applied.revision, 1);
+  assert.equal(applied.paintedRevision, 1);
+  assert.equal(applied.time, 1);
+  assert.equal(applied.paintedFruits, limits.TREE_MAX_FRUITS);
+  assert.equal(
+    serializeTreeState(
+      { ...props, fruits: [...paid, { id: "one-over", golden: false }] },
+      update.session,
+      2,
+      true,
+      true,
+    ),
+    null,
+  );
+  assert.equal(
+    serializeTreeState(
+      {
+        ...props,
+        wateringEvent: {
+          ...props.wateringEvent,
+          fruitIds: [...props.wateringEvent.fruitIds, "one-over"],
+        },
+      },
+      update.session,
+      2,
+      true,
+      true,
+    ),
+    null,
+  );
+  assert.equal(props.fruits.length, limits.TREE_MAX_FRUITS);
+  const small = serializeTreeState(
+    {
+      timeOfDay: 0.35,
+      answers: 0,
+      mine: [],
+      notes: [],
+      lanterns: 0,
+      fruits: paid.slice(0, 2),
+    },
+    update.session,
+    2,
+    true,
+    true,
+  );
+  for (const invalid of [
+    "{".repeat(limits.TREE_MAX_STATE_LENGTH + 1),
+    small.padEnd(limits.TREE_MAX_STATE_LENGTH + 1, " "),
+  ]) {
+    const rejected = update.receive(invalid);
+    assert.equal(rejected.revision, 1);
+    assert.equal(rejected.time, 1);
+  }
+  const countOverflow = JSON.stringify({
+    ...JSON.parse(small),
+    fruits: Array.from({ length: limits.TREE_MAX_FRUITS + 1 }, () => ({
+      id: "x",
+      golden: false,
+    })),
+  });
+  assert.equal(update.receive(countOverflow).revision, 1);
+  const eventOverflow = JSON.stringify({
+    ...JSON.parse(small),
+    wateringEvent: {
+      id: "overflow",
+      fruitId: "x",
+      fruitIds: Array.from({ length: limits.TREE_MAX_FRUITS + 1 }, () => "x"),
+      revision: 1,
+    },
+  });
+  assert.equal(update.receive(eventOverflow).revision, 1);
+  const recovered = update.receive(small);
+  assert.equal(recovered.revision, 2);
+  assert.equal(recovered.paintedRevision, 2);
+  assert.equal(recovered.time, 0.35);
+});
 
 test("fixed answer counts cannot force or suppress reference time-driven growth", () => {
   for (const time of [0, 0.1, 0.35, 0.5, 0.78, 1]) {

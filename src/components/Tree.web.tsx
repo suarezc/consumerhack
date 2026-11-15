@@ -1,7 +1,11 @@
 import { useCallback, useLayoutEffect, useRef } from "react";
 import { StyleSheet, View } from "react-native";
 
-import { normalizeTreeState, readTreeMessage } from "./tree/bridge";
+import {
+  normalizeTreeState,
+  readTreeMessage,
+  serializeTreeState,
+} from "./tree/bridge";
 import { TREE_HTML } from "./tree/html";
 import type { TreeProps } from "./tree/types";
 
@@ -32,6 +36,7 @@ export function Tree(props: TreeProps) {
   }, [props]);
   const session = useRef<string | null>(null);
   const revision = useRef(0);
+  const allowTaps = useRef(false);
 
   const requestReady = useCallback(() => {
     frame.current?.contentWindow?.postMessage(
@@ -42,18 +47,24 @@ export function Tree(props: TreeProps) {
 
   const synchronize = useCallback(() => {
     if (!session.current) return;
-    revision.current += 1;
-    frame.current?.contentWindow?.postMessage(
-      JSON.stringify({
-        type: "state",
-        session: session.current,
-        revision: revision.current,
-        ...normalizeTreeState(latest.current),
-        active: !document.hidden,
-        reduceMotion: false,
-      }),
-      "*",
+    const nextRevision = revision.current + 1;
+    const data = serializeTreeState(
+      latest.current,
+      session.current,
+      nextRevision,
+      !document.hidden,
+      false,
     );
+    if (data === null) {
+      allowTaps.current = false;
+      console.warn(
+        "Tree snapshot exceeds supported transport limits; no fruits were truncated.",
+      );
+      return;
+    }
+    revision.current = nextRevision;
+    allowTaps.current = true;
+    frame.current?.contentWindow?.postMessage(data, "*");
   }, []);
 
   useLayoutEffect(() => {
@@ -71,6 +82,7 @@ export function Tree(props: TreeProps) {
         return;
       }
       if (
+        !allowTaps.current ||
         message.session !== session.current ||
         message.revision !== revision.current ||
         message.index >= normalizeTreeState(latest.current).answers
