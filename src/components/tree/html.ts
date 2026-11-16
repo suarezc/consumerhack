@@ -323,6 +323,7 @@ ${LIGHT_RUNTIME}
   }
 
   let t = 0,
+    targetTime = 0,
     answerCount = 0,
     lanternCount = 0,
     initialized = false;
@@ -892,6 +893,7 @@ ${LIGHT_RUNTIME}
       lastTs = performance.now();
     }
     if (still) {
+      t = targetTime;
       bloom = bloomTarget;
       clearTransient();
     }
@@ -937,7 +939,7 @@ ${LIGHT_RUNTIME}
     value.mine.slice(0, CAP).forEach(function (i) {
       if (validIndex(i)) nextMine[i] = true;
     });
-    const reset = initialized && (nextCount < answerCount || nextT < t);
+    const reset = initialized && (nextCount < answerCount || nextT < targetTime);
     if (reset) clearTransient();
     const arrivals = [];
     if (initialized && !reset) {
@@ -945,7 +947,7 @@ ${LIGHT_RUNTIME}
         if (i >= answerCount || (nextMine[i] && !mine[i])) arrivals.push(i);
       }
     }
-    t = nextT;
+    targetTime = nextT;
     answerCount = nextCount;
     mine = nextMine;
     lanternCount = Math.min(64, value.lanterns);
@@ -973,7 +975,8 @@ ${LIGHT_RUNTIME}
     nativeStill = value.reduceMotion === true;
     still = nativeStill || media.matches;
     active = value.active !== false;
-    bloomTarget = bloomAt(t);
+    if (!initialized || reset || still) t = targetTime;
+    bloomTarget = bloomAt(targetTime);
     if (!initialized || reset || still) bloom = bloomTarget;
     revision = value.revision;
     initialized = true;
@@ -1078,6 +1081,8 @@ ${LIGHT_RUNTIME}
       const dt = Math.min(0.1, elapsed);
       lastTs = lastPaint = ts;
       clockT += elapsed;
+      t += (targetTime - t) * (1 - Math.exp(-elapsed * 3.6));
+      if (Math.abs(targetTime - t) < 0.0001) t = targetTime;
       px += (tpx - px) * Math.min(1, dt * 4);
       py += (tpy - py) * Math.min(1, dt * 4);
       bloom += (bloomTarget - bloom) * (1 - Math.exp(-elapsed * 2.8));
