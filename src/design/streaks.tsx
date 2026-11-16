@@ -94,7 +94,7 @@ function GivingFeedbackSession({ baselineId, event, onConsumed, color }: GivingF
     return () => clearTimeout(timer);
   }, [baselineId, eventId, eventBaseline, givingCount, isDemo, onConsumed]);
 
-  const text = notice ? 'Thank you. The tree is watered.' : '';
+  const text = notice ? 'Thank you for supporting S.A.C.K.' : '';
 
   useEffect(() => {
     if (Platform.OS === 'ios' && text) AccessibilityInfo.announceForAccessibilityWithOptions(text, { queue: true, priority: 'low' });

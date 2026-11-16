@@ -71,7 +71,7 @@ export function WateringBundles({ selectedBundles, onSelectBundles, onWater, can
   const validSelection = wateringChoices.some(choice => choice.bundles === selectedBundles);
   return <View style={styles.watering}>
     <StoryText variant="caption" color={theme.paper}>Choose a little care for S.A.C.K.</StoryText>
-    <View role="group" accessibilityLabel="Watering bundles" style={styles.choices}>
+    <View role="group" accessibilityLabel="Amounts" style={styles.choices}>
       {wateringChoices.map(choice => {
         const selected = selectedBundles === choice.bundles;
         return <Pressable key={choice.bundles} accessibilityRole="button"
@@ -90,11 +90,11 @@ export function WateringBundles({ selectedBundles, onSelectBundles, onWater, can
       })}
     </View>
     <StoryText variant="caption" color={theme.paper}>Each paid bundle adds a firefly and a fairy light. $0.50 per bundle.</StoryText>
-    {!canWater && <StoryText nativeID={`${id}-locked`} variant="caption" color={theme.paper}>Answer today’s question to water the tree.</StoryText>}
+    {!canWater && <StoryText nativeID={`${id}-locked`} variant="caption" color={theme.paper}>Answer today’s question first.</StoryText>}
     {!!error && <StoryText nativeID={`${id}-error`} accessibilityRole="alert" variant="caption" color={theme.paper}>{error}</StoryText>}
-    <StoryButton label="Water today's tree for S.A.C.K." loading={loading} disabled={disabled || !validSelection}
+    <StoryButton label="Support S.A.C.K." loading={loading} disabled={disabled || !validSelection}
       aria-busy={loading}
-      accessibilityHint={!canWater ? 'Answer today’s question first.' : 'Waters today’s tree.'}
+      accessibilityHint={!canWater ? 'Answer today’s question first.' : 'Opens checkout.'}
       aria-describedby={error ? `${id}-error` : !canWater ? `${id}-locked` : undefined}
       onPress={() => onWater(selectedBundles)} />
   </View>;

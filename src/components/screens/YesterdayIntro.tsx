@@ -55,7 +55,7 @@ export function YesterdayIntro({ intro, treeId }: { intro: FirstOpen; treeId: Id
       }); }}>
     <FruitDetailStatus status={fruitStatus} fruitCount={fruits.length} />
     {fruitStatus.status === "ready" && <Tree key={yesterday.dayId} timeOfDay={1} answers={yesterday.answererCount} mine={[]} notes={[]} lanterns={0}
-      fruits={fruits} lightBundles={yesterday.lightBundles} goldenLightBundles={yesterday.goldenLightBundles} lightEvent={null} style={{ height: 280 }} />}
+      fruits={fruits} lightBundles={Math.ceil(yesterday.lightBundles / 2)} goldenLightBundles={Math.ceil(yesterday.goldenLightBundles / 2)} lightEvent={null} style={{ height: 280 }} />}
     {busy && <StoryText variant="caption">Opening today’s question…</StoryText>}
   </YesterdayImpact></StoryScreen></View>;
 }

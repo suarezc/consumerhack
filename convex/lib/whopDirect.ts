@@ -74,14 +74,14 @@ export type DirectCheckoutInput = {
   treeId: string;
   memberId: string;
   answerId?: string;
-  bundles: 2 | 5 | 10;
+  bundles: number;
   applicationFeeCents: 0 | 1;
 };
 
 export async function createDirectCheckout(client: WhopClient, input: DirectCheckoutInput) {
   requireSandbox(process.env.WHOP_ENVIRONMENT);
   const recipient = accountId(input.recipientAccountId);
-  if (![2, 5, 10].includes(input.bundles) || ![0, 1].includes(input.applicationFeeCents)) {
+  if (!Number.isInteger(input.bundles) || input.bundles < 2 || input.bundles > 100 || ![0, 1].includes(input.applicationFeeCents)) {
     throw new Error("Unsupported watering bundles or platform fee");
   }
   for (const value of [input.intentId, input.userId, input.dayId, input.treeId, input.memberId, input.answerId ?? "absent"]) {

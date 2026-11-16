@@ -2,7 +2,7 @@ import { useMutation } from "convex/react";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { View } from "react-native";
+import { Share, View } from "react-native";
 
 import { Panel, Scene, sceneStyles } from "@/components/screens/Scene";
 import { LoadingDay, TreeNavigation } from "@/components/screens/Screen";
@@ -16,6 +16,8 @@ import { useSession } from "@/providers/SessionProvider";
 import { api } from "@/services/api";
 import { mutationError } from "@/services/errors";
 import { bloomLabel } from "@/services/ritual";
+
+const launch = { fresh: true };
 
 export function DailyTree({ bloom = false }: { bloom?: boolean }) {
   const { today } = useRitual();
@@ -66,10 +68,15 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
   const [sampleFailed, setSampleFailed] = useState(false);
   const sampleStarted = useRef(false);
   const lastRead = useRef(-1);
+  const [fireflies, setFireflies] = useState(0);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [preview, setPreview] = useState(0);
+  const [answeredBeforeLaunch] = useState(() => launch.fresh && today.myAnswer !== null);
+  useEffect(() => { launch.fresh = false; }, []);
   const deviceId = session?.deviceId;
   const treeId = today.tree.treeId;
-  const needsSample = today.tree.isHost && !today.myAnswer && !sampleFailed
-    && (!today.day.isDemo || today.day.bloomedAt !== undefined || now >= today.day.bloomAt);
+  const needsSample = today.tree.isHost && !sampleFailed && (answeredBeforeLaunch
+    || (!today.myAnswer && (!today.day.isDemo || today.day.bloomedAt !== undefined || now >= today.day.bloomAt)));
   useEffect(() => {
     if (!needsSample || !deviceId || sampleStarted.current) return;
     sampleStarted.current = true;
@@ -126,7 +133,8 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
       <FruitDetailStatus status={fruitStatus} fruitCount={fruits.length} />
     </View>}
     tree={{ answers: today.answerCount, mine: today.myAnswer ? [today.myAnswer.blossom] : [], notes, lanterns: 0, onTapBlossom: choose,
-      fruits, lightBundles: today.lightBundles, goldenLightBundles: today.goldenLightBundles, lightEvent: watering.treeEvent }}
+      fruits, lightBundles: Math.ceil(today.lightBundles / 2) + preview, goldenLightBundles: Math.ceil(today.goldenLightBundles / 2),
+      lightEvent: watering.treeEvent && { ...watering.treeEvent, lightBundles: Math.ceil(watering.treeEvent.lightBundles / 2) } }}
     overlay={(controlsHeight) => (
     <AnswerCard controlsHeight={controlsHeight} open={selected !== null} answer={selected && { id: selected.answerId, text: selected.text, author: selected.name, isMine: selected.memberId === today.member.memberId }}
       onClose={() => { if (!busy) { setSelectedIndex(null); setNoteComposer(false); setError(""); } }}
@@ -143,7 +151,6 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
           if (session && note.trim()) void run(() => sendNote({ deviceId: session.deviceId, answerId: selected.answerId, text: note.trim() }), () => { setNoteComposer(false); setNote(""); setNoteSent(true); });
         }} />
       </View>}
-      {selected && <StoryButton label="Water today's tree for S.A.C.K." onPress={() => { setSelectedIndex(null); setWateringOpen(true); }} />}
     </AnswerCard>
     )}>
     <GivingFeedback baselineId={watering.baselineId} event={watering.feedbackEvent} onConsumed={consumeGivingFeedback} color={detailUnavailable ? theme.text : theme.lantern} />
@@ -151,7 +158,8 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
     {today.myAnswer && !unlocked && <StoryText variant="caption" color={detailUnavailable ? theme.text : theme.paper}>Your answer is planted.</StoryText>}
     {!today.myAnswer && !canAnswer && <StoryText color={detailUnavailable ? theme.text : theme.paper}>{now < today.day.opensAt ? "The question opens soon." : "This day has closed. Come back for tomorrow’s question."}</StoryText>}
     {today.tree.isHost && !today.myAnswer && !canAnswer && <StoryButton label="Start a fresh day" tone="quiet" loading={busy} onPress={freshDay} />}
-    {today.myAnswer && <StoryButton label="Water today's tree for S.A.C.K." style={productSceneStyles.primary} onPress={() => setWateringOpen(true)} />}
+    {fireflies > 0 && <StoryButton label={`Share your ${fireflies} ${fireflies === 1 ? "firefly" : "fireflies"}`} tone="quiet" onPress={() => setShareOpen(true)} />}
+    {today.myAnswer && <StoryButton label="Support S.A.C.K." style={productSceneStyles.primary} onPress={() => setWateringOpen(true)} />}
     <TreeNavigation hill={!detailUnavailable} compact />
     {!!error && !composer && !selected && !settings && <StoryText color="#ffd27a" accessibilityRole="alert">{error}</StoryText>}
     {composer && <Panel title="What’s on your mind?" onClose={() => { if (!busy) setComposer(false); }}>
@@ -166,14 +174,21 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
       <StoryText variant="meta" color="#f6efe6">Invite code · {today.tree.code}</StoryText>
       <StoryText color="#f6efe6">Share this code with your circle. Your anonymous identity is not part of the invite.</StoryText>
       <RemindersSettings />
-      <StoryButton label="Water today's tree for S.A.C.K." disabled={!today.myAnswer} onPress={() => { setSettings(false); setWateringOpen(true); }} />
       {today.tree.isHost && <StoryButton label="Start a fresh day" tone="quiet" loading={busy} onPress={freshDay} />}
       {!!error && <StoryText color="#ffd27a" accessibilityRole="alert">{error}</StoryText>}
       <StoryButton label="Choose another tree" tone="quiet" loading={busy} onPress={() => {
         void run(() => selectTree(null), () => router.replace({ pathname: "/", params: { choose: "1" } }));
       }} />
     </Panel>}
-    {wateringOpen && <WateringComposer today={today} onClose={() => setWateringOpen(false)} />}
+    {wateringOpen && <WateringComposer today={today} onClose={() => setWateringOpen(false)}
+      onPreview={setPreview} onPaid={(added) => { setWateringOpen(false); setFireflies((count) => count + added); }} />}
+    {shareOpen && <Panel title="Your fireflies." onClose={() => setShareOpen(false)}>
+      <StoryText color="#ffd27a" style={{ fontSize: 72, lineHeight: 80, textAlign: "center" }}>{fireflies}</StoryText>
+      <StoryText color="#f6efe6" style={{ textAlign: "center" }}>{fireflies === 1 ? "firefly" : "fireflies"} on today’s tree are yours. Each one is a dollar for S.A.C.K.</StoryText>
+      <StoryButton label="Share" onPress={() => {
+        void Share.share({ message: `I lit ${fireflies} ${fireflies === 1 ? "firefly" : "fireflies"} on today’s StoryTime tree for S.A.C.K. https://suarezc-storytime.expo.app` }).catch(() => undefined);
+      }} />
+    </Panel>}
     {charityOpen && <Panel title="Today’s charity." onClose={() => setCharityOpen(false)}>
       <CharityDetails charity={today.charity} onOpenLink={(url) => {
         void WebBrowser.openBrowserAsync(url).catch(() => setError("The charity website couldn’t open. Please try again."));
