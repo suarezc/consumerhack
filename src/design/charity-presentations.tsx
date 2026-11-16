@@ -25,6 +25,10 @@ export function CharityDetails({ charity, onOpenLink }: CharityDetailsProps) {
       style={({ pressed }) => [styles.link, { borderColor: theme.line, opacity: pressed ? 0.75 : 1 }]}>
       <StoryText variant="meta" color={theme.paper} style={styles.choiceLabel}>Visit {charity.name}</StoryText>
     </Pressable>
+    <Pressable accessibilityRole="link" accessibilityLabel="S.A.C.K. on Whop" onPress={() => onOpenLink('https://whop.com/simple-acts')}
+      style={({ pressed }) => [styles.link, { borderColor: theme.line, opacity: pressed ? 0.75 : 1 }]}>
+      <StoryText variant="meta" color={theme.paper} style={styles.choiceLabel}>S.A.C.K. on Whop</StoryText>
+    </Pressable>
   </View>;
 }
 
