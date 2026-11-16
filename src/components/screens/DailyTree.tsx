@@ -143,7 +143,6 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
           if (session && note.trim()) void run(() => sendNote({ deviceId: session.deviceId, answerId: selected.answerId, text: note.trim() }), () => { setNoteComposer(false); setNote(""); setNoteSent(true); });
         }} />
       </View>}
-      {selected && <StoryButton label="Water today's tree for S.A.C.K." onPress={() => { setSelectedIndex(null); setWateringOpen(true); }} />}
     </AnswerCard>
     )}>
     <GivingFeedback baselineId={watering.baselineId} event={watering.feedbackEvent} onConsumed={consumeGivingFeedback} color={detailUnavailable ? theme.text : theme.lantern} />
@@ -166,7 +165,6 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
       <StoryText variant="meta" color="#f6efe6">Invite code · {today.tree.code}</StoryText>
       <StoryText color="#f6efe6">Share this code with your circle. Your anonymous identity is not part of the invite.</StoryText>
       <RemindersSettings />
-      <StoryButton label="Water today's tree for S.A.C.K." disabled={!today.myAnswer} onPress={() => { setSettings(false); setWateringOpen(true); }} />
       {today.tree.isHost && <StoryButton label="Start a fresh day" tone="quiet" loading={busy} onPress={freshDay} />}
       {!!error && <StoryText color="#ffd27a" accessibilityRole="alert">{error}</StoryText>}
       <StoryButton label="Choose another tree" tone="quiet" loading={busy} onPress={() => {
