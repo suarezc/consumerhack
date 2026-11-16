@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Withered peach with a new bud">
+      <defs><radialGradient id="g13" cx=".35" cy=".3" r=".8"><stop offset="0" style="stop-color:#A07462"/><stop offset="1" style="stop-color:#5C3A45"/></radialGradient></defs>
+      <ellipse cx="60" cy="108" rx="26" ry="4" fill="rgba(23,35,28,.14)"/>
+      <g transform="translate(64 104) scale(.78 .66) translate(-60 -104)">
+        <path d="M60 31C58 22 66 14 76 18" stroke="#7A5236" stroke-width="4" stroke-linecap="round" fill="none"/>
+        <path d="M60 30C38 22 16 40 18 66C20 92 42 106 60 104C78 106 100 92 102 66C104 40 82 22 60 30Z" fill="url(#g13)"/>
+        <g stroke="#3F2730" stroke-width="2.2" stroke-linecap="round" fill="none" opacity=".55">
+          <path d="M60 32C54 52 54 80 58 102"/><path d="M34 48C30 62 32 78 40 90"/><path d="M82 44C90 58 90 76 82 92"/><path d="M44 60C46 70 46 78 44 86"/><path d="M72 58C70 68 71 80 74 88"/>
+        </g>
+      </g>
+      <path d="M92 108C96 100 106 98 112 102C108 109 99 111 92 108Z" fill="#9AA56A"/>
+      <path d="M22 108C22 100 22 96 23 90" stroke="#3E9A5B" stroke-width="3" stroke-linecap="round" fill="none"/>
+      <path d="M23 92C16 90 12 84 13 79C19 80 23 85 23 92Z" fill="#3E9A5B"/>
+      <path d="M23 90C29 87 32 82 31 77C26 79 23 84 23 90Z" fill="#3E9A5B"/>
+    </svg>
