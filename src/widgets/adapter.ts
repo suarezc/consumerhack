@@ -16,10 +16,10 @@ export type AuthoritativeWidgetDay = {
 export function snapshotFromVerifiedDay(value: unknown): WidgetSnapshot | null {
   if (typeof value !== "object" || value === null) return null;
   const day = value as Partial<AuthoritativeWidgetDay>;
-  if (day.day?.isDemo !== false || typeof day.day.date !== "string" ||
+  if (typeof day.day?.date !== "string" ||
     typeof day.totalRaisedCents !== "number" || typeof day.answererCount !== "number" ||
     !day.streaks?.clock || !day.streaks.giving ||
-    day.streaks.isDemo !== false || day.day.date !== day.streaks.clock.date ||
+    (!day.day.isDemo && day.day.date !== day.streaks.clock.date) ||
     day.streaks.currency !== "USD" || !Number.isSafeInteger(day.streaks.undatedPaidCount) ||
     day.streaks.undatedPaidCount < 0 || !Number.isSafeInteger(day.streaks.giving.totalCents) ||
     day.streaks.giving.totalCents < 0) return null;

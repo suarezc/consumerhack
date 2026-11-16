@@ -99,9 +99,10 @@ describe("verified query projection", () => {
     expect(snapshotFromVerifiedDay(null)).toBeNull();
     expect(snapshotFromVerifiedDay({ ...day(), totalRaisedCents: undefined })).toBeNull();
     expect(snapshotFromVerifiedDay({ isDemo: false })).toBeNull();
-    expect(snapshotFromVerifiedDay({ ...day(), day: { isDemo: true, date: "2026-11-15" } })).toBeNull();
+  });
+  it("shows the sample day's giving streak so the demo widget is not empty", () => {
     const input = day(); input.streaks.isDemo = true;
-    expect(snapshotFromVerifiedDay(input)).toBeNull();
+    expect(snapshotFromVerifiedDay({ ...input, day: { isDemo: true, date: "demo:1" } })?.giving.count).toBe(3);
   });
   it("accepts the actual nested Today day DTO and rejects the old invented top-level flag", () => {
     expect(snapshotFromVerifiedDay(day())?.giving.count).toBe(3);
