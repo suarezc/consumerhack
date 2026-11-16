@@ -38,6 +38,14 @@
       ],
       "expo-secure-store",
       [
+        "./plugins/withStoryTimeWidgets.cjs",
+        {
+          "enabled": true,
+          "bundleIdentifier": "com.charlessuarez.storytime.widgets",
+          "groupIdentifier": "group.com.charlessuarez.storytime.widgets"
+        }
+      ],
+      [
         "expo-notifications",
         {
           "enableRemoteNotifications": false

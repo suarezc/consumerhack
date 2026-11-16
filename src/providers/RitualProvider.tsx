@@ -1,13 +1,18 @@
 import { useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { randomUUID } from "expo-crypto";
-import { createContext, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import Constants from "expo-constants";
+import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 
 import { StoryTimeProvider } from "@/design";
 import { useSession } from "@/providers/SessionProvider";
 import { api, type Id } from "@/services/api";
 import { ritualTime } from "@/services/ritual";
 import { createGivingObserver, emptyGivingDispatch, type GivingDispatch } from "@/services/giving";
+import { createNativeWidgetSync } from "@/widgets/native";
+import { createWidgetSessionBridge } from "@/widgets/sessionBridge";
+
+const widgetBridge = createWidgetSessionBridge(createNativeWidgetSync(Constants.expoConfig?.extra?.storytimeWidgetsEnabled === true));
 
 export type Today = NonNullable<FunctionReturnType<typeof api.days.today>>;
 export type FirstOpen = NonNullable<FunctionReturnType<typeof api.days.firstOpen>>;
@@ -28,6 +33,16 @@ export function RitualProvider({ children }: { children: ReactNode }) {
   const firstOpen = useQuery(api.days.firstOpen, session?.treeId ? {
     deviceId: session.deviceId, treeId: session.treeId as Id<"trees">,
   } : "skip");
+  const widgetScope = useRef<ReturnType<typeof widgetBridge.beginScope> | null>(null);
+  const widgetTreeId = session?.treeId;
+  useEffect(() => {
+    const scope = widgetBridge.beginScope();
+    widgetScope.current = scope;
+    return () => { widgetScope.current = null; void scope.close(); };
+  }, [widgetTreeId]);
+  useEffect(() => {
+    if (today !== undefined) void widgetScope.current?.publish(today && { ...today, answererCount: today.answerCount });
+  }, [today]);
   const [observer] = useState(() => createGivingObserver(randomUUID));
   const dispatch = useSyncExternalStore(observer.subscribe, observer.getSnapshot, () => emptyGivingDispatch);
   const contextId = today ? `${today.tree.treeId}:${today.day.dayId}:${today.streaks.clock.date}:${today.streaks.isDemo}` : null;
