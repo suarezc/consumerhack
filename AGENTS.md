@@ -1,6 +1,13 @@
 # StoryTime
 
-A daily charity-tree ritual: yesterday's impact → today's charity-related question → answer → water the shared tree → paid fireflies/fairy lights and a computed giving streak. Each response, not each paid bundle, grows one fruit. Charles's latest instruction, “Fruit should be by response. the bundles should add fireflies and fairylights,” supersedes the earlier paid-fruit model. Build for a reliable, beautiful phone demo at the Consumer Mobile Hackathon (https://consumermobilehackathon.com). Preserve Kindred and private notes, but do not expand them before this core loop works.
+A daily charity-tree ritual: open directly into yesterday's S.A.C.K. tree → today's charity-related question → answer and grow one response fruit → water the shared tree to add fireflies and fairy lights → a computed giving streak. No plant/join, name, tree-name or invite-code form gates first launch. Build for a reliable, beautiful phone experience at the Consumer Mobile Hackathon (https://consumermobilehackathon.com). Preserve Kindred and private notes without expanding them.
+
+## Shipped release and hackathon scope
+
+- The release source is `capy/testflight-widgets`, pinned at `03ffb4cc7085a7b326be4019d18c75dd0287c282` for this landing. Branch from the requested release pin for changes; only coordinator CONS-1 pushes to the release branch, runs EAS/TestFlight and deploys Convex. Open the requested pull request; never merge without Charles's explicit approval.
+- Prioritize direct work needed for the playable hackathon app. Do not initiate additional audits, hardening, privacy work, retry-safety work or review ceremony. Preserve existing fixes and contracts.
+- Visible app and widget UI must not contain “demo”, “sample” or “sandbox” labels or disclaimers. Internal source names, ledger tags and provider configuration remain unchanged; this copy rule does not change payment facts or authorize claims that funds reached the charity.
+- The response-fruit backend is already live on `gallant-warbler-923`. This landing needs no Convex deployment or codegen. Run only TypeScript and Expo lint for the landing task.
 
 ## Stack and identity
 
@@ -49,23 +56,30 @@ A daily charity-tree ritual: yesterday's impact → today's charity-related ques
 - `streaks.summary` and Today retain server clock, `answer:{count,status}`, `giving:{count,status,longest,totalCents}`, `currency:'USD'`, `isDemo`, `undatedPaidCount`. Yesterday/firstOpen retain all public/private impact and acknowledgement semantics; Yesterday and Grove return `lightEvent:null` so historical light counts never emit new payment feedback.
 - No ledger migration, stored counter, price/recipient/payment-authority change or provider reconfiguration is needed for this visual-semantic projection change. Prior genuine payment/replay proofs remain money evidence, not response-fruit or giving-light visual acceptance.
 
-## Yesterday, privacy and screens
+## Entry, yesterday and answer reading
 
-1. Join/create a tree by code.
+1. A fresh device stores its anonymous identity, automatically opens a S.A.C.K. tree and starts the seeded experience using the existing tree/day APIs. Existing selected trees and memberships are reused. Create/join forms remain secondary, reached through tree settings rather than first launch.
 2. First open each ritual day shows yesterday's completed tree, response fruit, giving lights, charity/programs and **“N people answered, M watered, $X raised for S.A.C.K.”**; show **“You gave $Y”** privately when applicable, then a button to today's question.
 3. Today shows the charity, question, daily paid total, answer, shared response-fruit tree, paid giving lights and giving streak. Allow watering after the caller answers without requiring bloom.
-4. Bloom preserves blossom reading, private notes and Kindred; do not expand these secondary features. Past days form the Grove, with a missed day a bare sapling.
+4. Tapping the tree opens an available answer; the answer-count detail also cycles through answers. Answer reading retains the participation-and-bloom gate. The seeded tree blooms when the viewer answers. Private notes and Kindred remain secondary. Past days form the Grove, with a missed day a bare sapling.
 - `days.yesterday` returns day/date, tree identity/name, charity, public counts/total, only the viewer's `myGivenCents`, fruits, demo flag and closedAt. No answer text, other people's individual amounts, bearer or provider identities.
 - `days.firstOpen` returns `{clock,todayDayId,shouldShowYesterday,yesterday}|null`. Queries never consume the intro. `days.acknowledgeYesterday({deviceId,treeId,dayId:todayDayId})` is transactional/idempotent per user/tree/day and rejects stale selected days. A new real day or demo run resets the intro.
 - Reading answer text still requires participation **and bloom**, enforced in Convex queries, independently of pre-bloom watering eligibility. Notes/reactions remain visible only to sender and answer author.
 
-## Demo
+## Seeded ten-minute day
 
-- A run compresses today's bloom into about one minute and schedules the existing three sample answers. Exactly three prior personal dates contain answers and explicit synthetic giving, so both streaks start at 3/at-risk; today's answer and next watering become 4.
+- The seeded day has a ten-minute answer window and schedules the existing three answers. Its tree visibly grows over the first minute; the viewer's answer completes bloom and opens answer reading. Exactly three prior personal dates contain answers and explicit synthetic giving, so both streaks start at 3/at-risk; today's answer and next watering become 4.
 - Completed yesterday has exactly 40 answerers and 12 distinct synthetic waterers including the host, each with two bundles: $12 gross/40 response fruits/24 giving-light units, viewer $1/one response fruit/two giving-light units. Only the two earlier personal dates are additionally seeded; no duplicate yesterday/fourth prior date.
-- History-only sample members do not inflate current quorum. Current demo response fruit starts at zero and grows one per answer. Giving lights start at zero and add2/5/10 per labelled watering interaction; multiple interactions are allowed with distinct validated request IDs. Retrying the same run/user/request is idempotent and changing its bundle count fails.
+- History-only sample members do not inflate current quorum. Current response fruit starts at zero and grows one per answer. Giving lights start at zero and add2/5/10 per watering interaction; multiple interactions are allowed with distinct validated request IDs. Retrying the same run/user/request is idempotent and changing its bundle count fails. Internal sample/demo state must not produce visible labels or disclaimers.
 - Synthetic rows are explicitly `source:'demo'`, tagged with run ID and have no provider payment ID. Active run data never enters real totals, real streaks or notification eligibility. Stop/restart hides old fixtures/events; stale answers, requests and scheduled seeds cannot mutate the new run.
 - Genuine sandbox payments remain real provider records even when originated during a demo. Immutable original day/run attribution survives provider latency and reset without reacting in a newer run.
+
+## Mounted peach giving widgets
+
+- Original colorful peach artwork from `design/streak-fruit.html` is the widget reference, not a firefly replacement. The personal fruit represents the giving streak independently of shared-tree response fruit. Preserve healthy, thirsty, withered/new-bud and never-watered blossom states, green/blush/ripe/gold milestones at1/3/7/30, and Bricolage/Inter typography for small, medium and circular sizes.
+- `RitualProvider` mounts `createNativeWidgetSync` through `createWidgetSessionBridge`. Publication uses the selected day's scalar giving summary, clock, totals and answer count, including the seeded giving streak; it never reads `Today.fruits` or derives giving from response fruit.
+- `./plugins/withStoryTimeWidgets.cjs` is enabled. The extension bundle is `com.charlessuarez.storytime.widgets`, AppGroup is `group.com.charlessuarez.storytime.widgets`, and target is `ExpoWidgetsTarget`. Preserve existing clear/generation behavior and the `storytime://` root link.
+- Remote notifications remain disabled through the SDK58 plugin option `enableRemoteNotifications:false`. Preserve App Store Connect app ID `6835243364`, the existing Expo project identity and the coordinator's signing/store configuration.
 
 ## Notifications
 
@@ -81,11 +95,11 @@ A daily charity-tree ritual: yesterday's impact → today's charity-related ques
 - Existing Tree props remain `timeOfDay` 0..1 (06:00–21:00), `answers`, `mine`, `notes`, `lanterns`, `onTapBlossom(index)`. The revised agreed backend-to-renderer contract is `fruits?:readonly {id:string;golden:false;mine?:boolean}[]` and `lightBundles?:number`, `goldenLightBundles?:number`, and `lightEvent?:{id:string;lightBundles:number;revision:number}|null`. Map backend fruitId/isMine to renderer id/mine. Change props only with both sides agreeing.
 - Design owns Tree, theme, fonts and motion; Build owns data/server and screen wiring, Design styles screens. One core owner owns schema/crons/payment lifecycle. Announce shared contracts through Captains; do not overwrite the preview debugger's bridge/bundle or Design rendering.
 - Actual public embedded/sandboxed preview growth and final native fruit behavior require their own QA; backend tests or top-level Chromium are not visual acceptance.
-- Keep small PRs, never push closed/merged branches, never merge without explicit approval for that PR. Coordinate every codegen/deployment slot and get independent exact-head review before reporting verified. Clearly separate simulated, actual provider, native and physical-device evidence.
+- Keep requested PR scope, never push closed/merged branches, and never merge without explicit approval for that PR. Do not push to the coordinator's release branch or initiate extra review work. Clearly separate source checks, actual provider, native and physical-device evidence.
 
 ## Checks
 
-Before declaring work done: `npx tsc --noEmit`, `npx expo lint`, and `npx convex dev --once` when `convex/` changed (it typechecks and pushes the functions).
+For this landing, run `npx tsc --noEmit` and `npx expo lint` only. Do not run tests, extra audits, Convex deploys or codegen. Deployment remains the coordinator's responsibility and requires an explicit instruction.
 
 This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
 
