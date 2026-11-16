@@ -71,7 +71,7 @@ describe('historical fruit', () => {
   it('uses only that fruit’s supplied golden/milestone metadata', () => {
     expect(describeFruit(fruit)).toBe('golden fruit for the 3-day giving milestone');
     expect(describeFruit({ ...fruit, golden: false, milestone: null })).toBe('fruit');
-    expect(describeFruit({ ...fruit, golden: true, milestone: 7, source: 'demo' })).toBe('Sample golden fruit for the 7-day giving milestone');
+    expect(describeFruit({ ...fruit, golden: true, milestone: 7, source: 'demo' })).toBe('golden fruit for the 7-day giving milestone');
     expect(describeFruit({ ...fruit, milestone: 30 })).toBe('golden fruit for the 30-day giving milestone');
   });
 });

@@ -10,6 +10,7 @@ type SceneProps = {
   title: string;
   meta: string;
   detail?: string;
+  onPressDetail?: () => void;
   tree?: Partial<Pick<TreeProps, "answers" | "mine" | "notes" | "lanterns" | "onTapBlossom" | "fruits" | "lightBundles" | "goldenLightBundles" | "lightEvent">>;
   treeKey?: string;
   treeUnavailable?: boolean;
@@ -19,10 +20,10 @@ type SceneProps = {
   underQuestion?: ReactNode;
 };
 
-export function Scene({ timeOfDay, title, meta, detail, tree, treeKey, treeUnavailable, children, overlay, onOpenTree, underQuestion }: SceneProps) {
+export function Scene({ timeOfDay, title, meta, detail, onPressDetail, tree, treeKey, treeUnavailable, children, overlay, onOpenTree, underQuestion }: SceneProps) {
   return <>
     <StatusBar style={timeOfDay > 0.75 ? "light" : "dark"} />
-    <ProductScene title={title} meta={meta} detail={detail} onOpenTree={onOpenTree} underQuestion={underQuestion} overlay={overlay} tree={
+    <ProductScene title={title} meta={meta} detail={detail} onPressDetail={onPressDetail} onOpenTree={onOpenTree} underQuestion={underQuestion} overlay={overlay} tree={
       treeUnavailable ? null : <Tree key={treeKey} timeOfDay={timeOfDay} answers={tree?.answers ?? 0} mine={tree?.mine ?? []}
       notes={tree?.notes ?? []} lanterns={tree?.lanterns ?? 0} onTapBlossom={tree?.onTapBlossom}
       fruits={tree?.fruits ?? []} lightBundles={tree?.lightBundles ?? 0}

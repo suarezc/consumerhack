@@ -19,7 +19,7 @@ export function RemindersSettings() {
   return <View style={{ gap: 12 }}>
     <StoryText variant="meta" color="#f6efe6">Watering reminders</StoryText>
     <StoryText variant="caption" color="#c6c1c2" accessibilityLiveRegion="polite">{message}</StoryText>
-    <StoryText variant="caption" color="#c6c1c2">Optional. After bloom, a reminder can help you continue yesterday’s giving streak. Demo days never send reminders.</StoryText>
+    <StoryText variant="caption" color="#c6c1c2">Optional. After bloom, a reminder can help you continue yesterday’s giving streak.</StoryText>
     {status && status.state !== "registered" && <StoryButton
       label={status.state === "denied" || status.state === "sync_failed" ? "Check reminder settings" : "Allow reminders"}
       loading={busy && lastAction !== "out"} disabled={busy && lastAction === "out"}

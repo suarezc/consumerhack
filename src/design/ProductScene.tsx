@@ -11,42 +11,45 @@ export type ProductSceneProps = {
   meta: string;
   underQuestion?: ReactNode;
   detail?: string;
+  onPressDetail?: () => void;
   onOpenTree?: () => void;
   children?: ReactNode;
   overlay?: (controlsHeight: number) => ReactNode;
 };
 
-export function ProductScene({ tree, title, meta, underQuestion, detail, onOpenTree, children, overlay }: ProductSceneProps) {
+export function ProductScene({ tree, title, meta, underQuestion, detail, onPressDetail, onOpenTree, children, overlay }: ProductSceneProps) {
   const { theme } = useStoryTime();
   const [height, setHeight] = useState(0);
   const [headerHeight, setHeaderHeight] = useState(0);
   const [controls, setControls] = useState({ y: 0, height: 120 });
-  const [scrollY, setScrollY] = useState(0);
   const insets = useSafeAreaInsets();
-  const controlsHeight = height && controls.y ? Math.max(0, Math.min(height, height - insets.top - controls.y + scrollY)) : controls.height;
+  const controlsHeight = height && controls.y ? Math.max(0, Math.min(height, height - insets.top - controls.y)) : controls.height;
   return <View onLayout={event => setHeight(event.nativeEvent.layout.height)} style={[styles.scene, { backgroundColor: theme.skyTop }]}>
     <View style={StyleSheet.absoluteFill}>{tree}</View>
     <SafeAreaView edges={['top', 'bottom', 'left', 'right']} pointerEvents="box-none" style={styles.scene}>
-      <ScrollView pointerEvents="box-none" style={styles.scene} contentContainerStyle={styles.foreground}
-        keyboardShouldPersistTaps="handled" scrollEventThrottle={16} onScroll={event => setScrollY(event.nativeEvent.contentOffset.y)}>
+      <View pointerEvents="box-none" style={styles.scene}>
       <View onLayout={event => setHeaderHeight(event.nativeEvent.layout.height)}
         style={[styles.header, headerHeight > height * 0.35 && { backgroundColor: theme.skyTop }]} pointerEvents="box-none">
         <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: theme.screenScrim }]} />
         <View style={styles.metaRow}>
           <StoryText variant="meta" color={theme.text} style={styles.meta}>{meta}</StoryText>
-          {onOpenTree && <Pressable accessibilityRole="button" accessibilityLabel="Tree settings and demo" onPress={onOpenTree} style={styles.smallAction}>
+          {onOpenTree && <Pressable accessibilityRole="button" accessibilityLabel="Tree settings" onPress={onOpenTree} style={styles.smallAction}>
             <StoryText variant="meta" color={theme.text} style={styles.meta}>More</StoryText>
           </Pressable>}
         </View>
         <StoryText variant="question" color={theme.text} accessibilityRole="header" style={styles.question}>{title}</StoryText>
         {underQuestion}
-        {!!detail && <StoryText variant="caption" color={theme.text} style={{ fontSize: 14, lineHeight: 20 }}>{detail}</StoryText>}
+        {!!detail && (onPressDetail
+          ? <Pressable accessibilityRole="button" onPress={onPressDetail} hitSlop={14} style={{ alignSelf: 'flex-start' }}>
+            <StoryText variant="caption" color={theme.text} style={{ fontSize: 14, lineHeight: 20, textDecorationLine: 'underline' }}>{detail}</StoryText>
+          </Pressable>
+          : <StoryText variant="caption" color={theme.text} style={{ fontSize: 14, lineHeight: 20 }}>{detail}</StoryText>)}
       </View>
       <View pointerEvents="box-none" style={styles.treeSpace} />
       <View onLayout={event => setControls(event.nativeEvent.layout)} style={styles.controls}>
         {children}
       </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
     {overlay?.(controlsHeight)}
   </View>;
@@ -77,7 +80,6 @@ export function ProductSheet({ open = true, title, onClose, children, onShow }: 
 
 const styles = StyleSheet.create({
   scene: { flex: 1 },
-  foreground: { flexGrow: 1, pointerEvents: 'box-none' },
   header: { paddingHorizontal: 28, paddingTop: 10, gap: 10, width: '100%', maxWidth: 560, alignSelf: 'center' },
   metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
   meta: { fontSize: 9, lineHeight: 15, letterSpacing: 1.6 },

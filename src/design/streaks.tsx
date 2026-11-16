@@ -15,17 +15,16 @@ export function TodayStreaks({ summary, color, compact = false }: TodayStreaksPr
   if (compact) {
     const copy = streakCopy(summary.giving, 'giving');
     return <View style={styles.inline}><RitualMark kind="fruit" /><StoryText variant="caption" color={ink}
-      accessibilityLabel={`${summary.isDemo ? 'Demo sample. ' : ''}${copy.description}`} style={{ fontSize: 14, lineHeight: 20 }}>{copy.label}</StoryText></View>;
+      accessibilityLabel={`${copy.description}`} style={{ fontSize: 14, lineHeight: 20 }}>{copy.label}</StoryText></View>;
   }
   return <View style={[styles.group, styles.today]}>
-    {summary.isDemo && <StoryText variant="meta" color={ink}>Demo · sample days</StoryText>}
     <View style={styles.streakRow}>
       {(['giving', 'answer'] as const).map((kind) => {
         const copy = streakCopy(summary[kind], kind);
         return <View key={kind} style={styles.streak}>
           <View style={styles.inline}>
             <RitualMark kind={kind === 'answer' ? 'blossom' : 'fruit'} />
-            <StoryText variant="meta" color={ink} accessibilityLabel={`${summary.isDemo ? 'Demo sample. ' : ''}${copy.description}`}
+            <StoryText variant="meta" color={ink} accessibilityLabel={`${copy.description}`}
               style={styles.label}>{copy.label}</StoryText>
           </View>
           {!!copy.detail && <StoryText variant="meta" color={ink} style={styles.continue}>{copy.detail}</StoryText>}
@@ -44,17 +43,16 @@ export function GroveGivingSummary({ summary, color }: GroveGivingSummaryProps) 
   const longest = Number.isSafeInteger(summary.giving.longest) && summary.giving.longest >= 0 ? summary.giving.longest : null;
   const total = formatGivenTotal(summary.giving.totalCents, summary.currency);
   return <View style={styles.group}>
-    {summary.isDemo && <StoryText variant="meta" color={ink}>Demo · sample giving history</StoryText>}
     <View style={styles.historyRow}>
       <View style={styles.historyStat}>
         <StoryText variant="meta" color={ink}>Longest giving</StoryText>
-        <StoryText color={ink} accessibilityLabel={`${summary.isDemo ? 'Demo sample. ' : ''}Longest giving streak: ${longest === null ? 'unavailable' : `${longest} ${longest === 1 ? 'day' : 'days'}`}`}>
+        <StoryText color={ink} accessibilityLabel={`Longest giving streak: ${longest === null ? 'unavailable' : `${longest} ${longest === 1 ? 'day' : 'days'}`}`}>
           {longest === null ? 'Unavailable' : `${longest} ${longest === 1 ? 'day' : 'days'}`}
         </StoryText>
       </View>
       <View style={styles.historyStat}>
-        <StoryText variant="meta" color={ink}>{summary.isDemo ? 'Sample total' : 'Total given'}</StoryText>
-        <StoryText color={ink} accessibilityLabel={`${summary.isDemo ? 'Synthetic sample total, not real money' : 'Total confirmed giving'}: ${total}`}>{total}</StoryText>
+        <StoryText variant="meta" color={ink}>Total given</StoryText>
+        <StoryText color={ink} accessibilityLabel={`Total given: ${total}`}>{total}</StoryText>
       </View>
     </View>
     {summary.undatedPaidCount > 0 && <StoryText variant="caption" color={ink}
@@ -96,7 +94,7 @@ function GivingFeedbackSession({ baselineId, event, onConsumed, color }: GivingF
     return () => clearTimeout(timer);
   }, [baselineId, eventId, eventBaseline, givingCount, isDemo, onConsumed]);
 
-  const text = notice ? `${notice.isDemo ? 'Demo · sample: ' : ''}${notice.givingCount} ${notice.givingCount === 1 ? 'day' : 'days'} of giving` : '';
+  const text = notice ? `${notice.givingCount} ${notice.givingCount === 1 ? 'day' : 'days'} of giving` : '';
 
   useEffect(() => {
     if (Platform.OS === 'ios' && text) AccessibilityInfo.announceForAccessibilityWithOptions(text, { queue: true, priority: 'low' });

@@ -59,11 +59,10 @@ export function GroveThumbnail({ dayLabel, question, answers, missed = false, ti
   const count = Number.isFinite(answers) ? Math.max(0, Math.floor(answers)) : 0;
   const summary = missed ? 'A day you missed · a bare sapling' : `${count} ${count === 1 ? 'answer' : 'answers'}`;
   const fruits = personalFruits?.filter((fruit) => fruit.isMine) ?? [];
-  const sample = isDemo || fruits.some((fruit) => fruit.source === 'demo');
   const fruitCount = `${fruits.length} ${fruits.length === 1 ? 'fruit' : 'fruits'} from your giving`;
   const fruitDescription = fruits.length ? `${fruitCount}. ${[...new Set(fruits.map(describeFruit))].join('. ')}` : '';
   const milestones = [...new Set(fruits.filter((fruit) => fruit.golden && fruit.milestone).map((fruit) => fruit.milestone))];
-  const accessibleDescription = `${sample ? 'Demo sample history. ' : ''}${dayLabel}. ${question ?? ''}. ${summary}. ${fruitDescription}`;
+  const accessibleDescription = `${dayLabel}. ${question ?? ''}. ${summary}. ${fruitDescription}`;
   const positions = missed ? [[82, 58], [59, 76], [92, 78], [73, 96], [83, 84], [65, 66]]
     : [[40, 58], [69, 36], [99, 61], [55, 83], [87, 92], [29, 88]];
   const content = <>
@@ -80,7 +79,6 @@ export function GroveThumbnail({ dayLabel, question, answers, missed = false, ti
     </View>
     <View style={styles.thumbnailWords}>
       <StoryText variant="meta" color={theme.paper}>{dayLabel}</StoryText>
-      {sample && <StoryText variant="meta" color={theme.paper}>Demo · sample history</StoryText>}
       {!!question && <StoryText variant="caption" color={theme.paper}>{question}</StoryText>}
       <StoryText variant="meta" color={missed ? theme.muted : theme.lantern}>{missed ? 'A quiet day' : summary}</StoryText>
       {fruits.length > 0 && <StoryText variant="meta" color={theme.paper} accessibilityLabel={fruitDescription}>{fruitCount}</StoryText>}
