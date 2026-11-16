@@ -1,7 +1,7 @@
 import { useMutation } from "convex/react";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { View } from "react-native";
 
 import { Panel, Scene, sceneStyles } from "@/components/screens/Scene";
@@ -17,6 +17,8 @@ import { useSession } from "@/providers/SessionProvider";
 import { api } from "@/services/api";
 import { mutationError } from "@/services/errors";
 import { bloomLabel } from "@/services/ritual";
+
+const sample = { declined: false };
 
 export function DailyTree({ bloom = false }: { bloom?: boolean }) {
   const { today } = useRitual();
@@ -52,6 +54,17 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
   const fruits = useMemo(() => today.fruits.map((fruit) => ({ id: fruit.fruitId, golden: false, mine: fruit.isMine })), [today.fruits]);
   const fruitStatus = getTreeDataStatus({ fruits });
   const detailUnavailable = fruitStatus.status === "unavailable";
+  const [sampleFailed, setSampleFailed] = useState(false);
+  const sampleStarted = useRef(false);
+  const deviceId = session?.deviceId;
+  const treeId = today.tree.treeId;
+  const needsSample = today.tree.isHost && !today.myAnswer && !sampleFailed && !sample.declined
+    && (!today.day.isDemo || today.day.bloomedAt !== undefined || now >= today.day.bloomAt);
+  useEffect(() => {
+    if (!needsSample || !deviceId || sampleStarted.current) return;
+    sampleStarted.current = true;
+    restartDemo({ deviceId, treeId }).catch(() => setSampleFailed(true));
+  }, [needsSample, deviceId, treeId, restartDemo]);
 
   async function run(action: () => Promise<unknown>, after?: () => void) {
     if (pending.current) return;
@@ -77,6 +90,8 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
     setNote("");
     setError("");
   }
+
+  if (needsSample) return <Scene timeOfDay={timeOfDay} meta="StoryTime · S.A.C.K." title="Opening today’s tree…" />;
 
   const detail = unlocked ? `${today.answerCount} ${today.answerCount === 1 ? "blossom" : "blossoms"} · tap one to read` : `${today.answerCount} of ${today.memberCount} answered${today.day.isDemo ? "" : ` · bloom ${bloomLabel(today.day.bloomAt)} local time`}`;
   return <Scene timeOfDay={timeOfDay} title={today.day.question}
@@ -134,12 +149,12 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
       {today.tree.isHost && <StoryButton label="Demo tools" tone="quiet" onPress={() => { setSettings(false); setDemoSettings(true); }} />}
       {!!error && <StoryText color="#ffd27a" accessibilityRole="alert">{error}</StoryText>}
       <StoryButton label="Choose another tree" tone="quiet" loading={busy} onPress={() => {
-        void run(() => selectTree(null), () => router.replace("/"));
+        void run(() => selectTree(null), () => router.replace({ pathname: "/", params: { choose: "1" } }));
       }} />
     </Panel>}
     {demoSettings && <DemoPanel isDemo={today.day.isDemo} busy={busy} error={error} onClose={() => { if (!busy) setDemoSettings(false); }}
       onRestart={() => { if (session) void run(() => restartDemo({ deviceId: session.deviceId, treeId: today.tree.treeId }), () => { setDemoSettings(false); router.replace("/today"); }); }}
-      onStop={() => { if (session) void run(() => stopDemo({ deviceId: session.deviceId, treeId: today.tree.treeId }), () => { setDemoSettings(false); router.replace("/today"); }); }} />}
+      onStop={() => { if (session) void run(() => { sample.declined = true; return stopDemo({ deviceId: session.deviceId, treeId: today.tree.treeId }); }, () => { setDemoSettings(false); router.replace("/today"); }); }} />}
     {wateringOpen && <WateringComposer today={today} onClose={() => setWateringOpen(false)} />}
     {charityOpen && <Panel title="Today’s charity." onClose={() => setCharityOpen(false)}>
       <CharityDetails charity={today.charity} onOpenLink={(url) => {

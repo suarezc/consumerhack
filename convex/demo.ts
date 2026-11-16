@@ -24,7 +24,7 @@ export const restart = mutation({
     const userId = await ensureMemberUser(ctx, host!);
     const causeId = await ensureSackCause(ctx);
     const opensAt = Date.now();
-    const bloomAt = opensAt + 60_000;
+    const bloomAt = opensAt + 10 * 60_000;
     const ritualDate = ritualWindow(opensAt).date;
     const dayId = await ctx.db.insert("days", { treeId, date: `demo:${opensAt}`, ritualDate, question: "What small thing made today feel a little softer?", opensAt, bloomAt, isDemo: true, charity: sackCharity, causeId });
     await ctx.db.patch(dayId, { demoRunId: dayId });

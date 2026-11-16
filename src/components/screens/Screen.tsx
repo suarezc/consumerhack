@@ -76,7 +76,7 @@ export function LoadingDay() {
     <StoryText color="#f6efe6">{today === undefined ? "Waiting for your tree. If this takes a while, check your connection." : "Today’s question isn’t available yet. You may have joined after the bloom."}</StoryText>
     <StoryButton label="Choose another tree" tone="quiet" loading={busy} onPress={() => {
       setBusy(true);
-      void selectTree(null).then(() => router.replace("/")).catch(() => setError(true)).finally(() => setBusy(false));
+      void selectTree(null).then(() => router.replace({ pathname: "/", params: { choose: "1" } })).catch(() => setError(true)).finally(() => setBusy(false));
     }} />
     {error && <StoryText color="#ffd27a" accessibilityRole="alert">This device couldn’t save the change. Please try again.</StoryText>}
     <TreeNavigation hill />

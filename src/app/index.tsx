@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "convex/react";
-import { Redirect } from "expo-router";
-import { useRef, useState } from "react";
+import { Redirect, useLocalSearchParams } from "expo-router";
+import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 
 import { Panel, Scene, sceneStyles } from "@/components/screens/Scene";
@@ -12,7 +12,45 @@ import { api } from "@/services/api";
 import { mutationError } from "@/services/errors";
 
 export default function Entry() {
-  return <SessionGate><JoinTree /></SessionGate>;
+  const { choose } = useLocalSearchParams<{ choose?: string }>();
+  return <SessionGate>{choose ? <JoinTree /> : <OpenTree />}</SessionGate>;
+}
+
+function OpenTree() {
+  const { session, selectTree } = useSession();
+  const { timeOfDay } = useRitual();
+  const trees = useQuery(api.trees.list, session && !session.treeId ? { deviceId: session.deviceId } : "skip");
+  const create = useMutation(api.trees.create);
+  const restartDemo = useMutation(api.demo.restart);
+  const opening = useRef(false);
+  const planted = useRef<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (!session || session.treeId || !trees || failed || opening.current) return;
+    opening.current = true;
+    void (async () => {
+      try {
+        let treeId: string | null = planted.current ?? (trees.find((tree) => tree.isHost) ?? trees[0])?.treeId ?? null;
+        if (!treeId) {
+          const tree = await create({ deviceId: session.deviceId, name: "The S.A.C.K. tree", memberName: "You" });
+          treeId = planted.current = tree.treeId;
+          await restartDemo({ deviceId: session.deviceId, treeId: tree.treeId }).catch(() => undefined);
+        }
+        await selectTree(treeId);
+      } catch {
+        setFailed(true);
+      } finally {
+        opening.current = false;
+      }
+    })();
+  }, [session, trees, failed, create, restartDemo, selectTree]);
+
+  if (session?.treeId) return <Redirect href="/today" />;
+  return <Scene timeOfDay={timeOfDay} meta="StoryTime · S.A.C.K." title="Opening today’s tree…">
+    {failed && <StoryText color="#ffd27a" accessibilityRole="alert">We couldn’t reach the garden. Check your connection and try again.</StoryText>}
+    {failed && <StoryButton label="Try again" onPress={() => setFailed(false)} />}
+  </Scene>;
 }
 
 function JoinTree() {

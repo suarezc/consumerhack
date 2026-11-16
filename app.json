@@ -9,7 +9,10 @@
     "userInterfaceStyle": "light",
     "backgroundColor": "#0b1030",
     "ios": {
-      "bundleIdentifier": "com.charlessuarez.storytime"
+      "bundleIdentifier": "com.charlessuarez.storytime",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
