@@ -1,11 +1,11 @@
 import { createWidget } from "expo-widgets";
 
 import { GivingWidget } from "./GivingWidget";
-import { emptyWidget } from "./model";
+import { emptyWidget, type WidgetProps } from "./model";
 
 const widget = (() => {
   try {
-    return createWidget("StoryTimeGiving", GivingWidget, {
+    return createWidget<WidgetProps>("StoryTimeGiving", GivingWidget, {
       ...emptyWidget("storytime://"),
       count: 0,
       expiresAt: 0,
