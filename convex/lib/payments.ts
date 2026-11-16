@@ -13,7 +13,7 @@ export function validateAmount(amountCents: number) {
 }
 
 export function bundleCents(bundles: number) {
-  if (bundles !== 2 && bundles !== 5 && bundles !== 10) throw new Error("Choose 2, 5 or 10 bundles");
+  if (!Number.isInteger(bundles) || bundles < 2 || bundles > 100) throw new Error("Choose an amount from $1 to $50");
   return bundles * 50;
 }
 

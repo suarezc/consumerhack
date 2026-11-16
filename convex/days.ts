@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, type QueryCtx, type MutationCtx } from "./_generated/server";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { requireMember } from "./access";
 import { ritualWindow } from "./questions";
 import { contributionScope, dayGiving, userSummary } from "./streaks";
@@ -8,6 +8,11 @@ import { sackCharity, wateringLabel } from "./charity";
 import { dayImpact } from "./impact";
 import { ensureMemberUser } from "./identity";
 import { shiftDate, ritualClock } from "./lib/streakLogic";
+
+function responseFruits(answers: readonly Doc<"answers">[], viewer: Id<"members">, ownOnly = false) {
+  return answers.filter(answer => !ownOnly || answer.memberId === viewer)
+    .map(answer => ({ fruitId: `response:${answer._id}`, isMine: answer.memberId === viewer, golden: false as const }));
+}
 
 async function selectedDay(ctx: QueryCtx | MutationCtx, tree: Doc<"trees">) {
   const real = await ctx.db.query("days").withIndex("by_tree_date", q => q.eq("treeId", tree._id)).order("desc")
@@ -23,8 +28,10 @@ async function yesterdayResult(ctx: QueryCtx | MutationCtx, tree: Doc<"trees">, 
     await ctx.db.query("days").withIndex("by_tree_date", q => q.eq("treeId", tree._id).eq("date", date)).unique();
   if (!day) return null;
   const impact = await dayImpact(ctx, day, viewer);
+  const answers = await ctx.db.query("answers").withIndex("by_day", q => q.eq("dayId", day._id)).collect();
+  const { lightBundles, goldenLightBundles } = await dayGiving(ctx, day, viewer._id, today.isDemo ? today : null);
   return { dayId: day._id, date, tree: { treeId: tree._id, name: tree.name }, charity: day.charity ?? sackCharity,
-    ...impact, fruits: (await dayGiving(ctx, day, viewer._id, today.isDemo ? today : null)).fruits,
+    ...impact, fruits: responseFruits(answers, viewer._id), lightBundles, goldenLightBundles, lightEvent: null,
     isDemo: !!day.isDemo, closedAt: day.closedAt ?? null };
 }
 
@@ -59,7 +66,7 @@ export const today = query({
     const paid = (await ctx.db.query("lanterns").withIndex("by_tree", q => q.eq("treeId", treeId)).collect()).filter(l => l.status === "paid" && l.source !== "demo");
     const run = await contributionScope(ctx, treeId);
     const streaks = await userSummary(ctx, deviceId, run);
-    const { fruits, wateringEvent } = await dayGiving(ctx, day, member._id, run);
+    const { lightBundles, goldenLightBundles, lightEvent } = await dayGiving(ctx, day, member._id, run);
     const impact = await dayImpact(ctx, day, member);
     return {
       tree: { treeId, name: tree.name, code: tree.code, cause: tree.cause, isHost: tree.hostDeviceId === deviceId },
@@ -68,7 +75,7 @@ export const today = query({
       memberCount: members.length, answerCount: allAnswers.length,
       myAnswer: mine ? { answerId: mine._id, blossom: mine.blossom } : null,
       answers, notes, lanternCount: paid.length, raisedCents: paid.reduce((total, l) => total + l.amountCents, 0),
-      streaks, fruits, wateringEvent,
+      streaks, fruits: responseFruits(allAnswers, member._id), lightBundles, goldenLightBundles, lightEvent,
       charity: day.charity ?? sackCharity, ...impact, wateringLabel,
     };
   },
@@ -88,9 +95,11 @@ export const grove = query({
       const answers = await ctx.db.query("answers").withIndex("by_day", q => q.eq("dayId", day._id)).collect();
       const mine = answers.find(a => a.memberId === member._id);
       const date = day.ritualDate ?? day.date;
+      const { lightBundles, goldenLightBundles } = await dayGiving(ctx, day, member._id, run, true);
       return { dayId: day._id, date, question: day.question, bloomAt: day.bloomAt, bloomedAt: day.bloomedAt,
         answered: !!mine, answerCount: answers.length, blossom: mine?.blossom ?? null,
-        fruits: (await dayGiving(ctx, day, member._id, run, true)).fruits, charity: day.charity ?? sackCharity, isDemo: !!run };
+        fruits: responseFruits(answers, member._id, true), lightBundles, goldenLightBundles, lightEvent: null,
+        charity: day.charity ?? sackCharity, isDemo: !!run };
     }));
   },
 });

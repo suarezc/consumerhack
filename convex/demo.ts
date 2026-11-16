@@ -24,7 +24,7 @@ export const restart = mutation({
     const userId = await ensureMemberUser(ctx, host!);
     const causeId = await ensureSackCause(ctx);
     const opensAt = Date.now();
-    const bloomAt = opensAt + 60_000;
+    const bloomAt = opensAt + 10 * 60_000;
     const ritualDate = ritualWindow(opensAt).date;
     const dayId = await ctx.db.insert("days", { treeId, date: `demo:${opensAt}`, ritualDate, question: "What small thing made today feel a little softer?", opensAt, bloomAt, isDemo: true, charity: sackCharity, causeId });
     await ctx.db.patch(dayId, { demoRunId: dayId });
@@ -59,6 +59,24 @@ export const restart = mutation({
             whopCheckoutId: `demo:${dayId}:yesterday:${index}`, createdAt: start + DAY_MS / 4,
             paidAt: start + DAY_MS / 4, creditedDate: date, source: "demo", demoRunId: dayId });
         }
+      }
+      await refreshClosedImpact(ctx, historyId);
+    }
+    const friends = (await ctx.db.query("members").withIndex("by_tree", q => q.eq("treeId", treeId)).collect()).filter(member => member.demoHistory);
+    for (let offset = -9; offset < -3; offset++) {
+      const date = shiftDate(ritualDate, offset);
+      const start = Date.parse(`${date}T06:00:00Z`);
+      const historyId = await ctx.db.insert("days", { treeId, date: `demo:${dayId}:${date}`, ritualDate: date,
+        question: questionFor(date), opensAt: start, bloomAt: start + 15 * 60 * 60 * 1000,
+        bloomedAt: start + 15 * 60 * 60 * 1000, closedAt: start + DAY_MS,
+        isDemo: true, demoRunId: dayId, charity: sackCharity, causeId });
+      let blossom = 0;
+      if (offset !== -4) await ctx.db.insert("answers", { dayId: historyId, treeId, memberId: host!._id, userId,
+        text: samples[(offset + 9) % samples.length].text, blossom: blossom++, createdAt: start + DAY_MS / 4 });
+      for (const friend of friends.slice(0, 6 + ((offset + 9) * 5) % 17)) {
+        const friendUser = await ensureMemberUser(ctx, friend);
+        await ctx.db.insert("answers", { dayId: historyId, treeId, memberId: friend._id, userId: friendUser,
+          text: samples[blossom % samples.length].text, blossom: blossom++, createdAt: start + DAY_MS / 4 });
       }
       await refreshClosedImpact(ctx, historyId);
     }

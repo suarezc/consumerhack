@@ -1,3 +1,7 @@
+import { FRUIT_RUNTIME } from "./fruitRuntime";
+import { LIGHT_RUNTIME } from "./lightRuntime";
+import { TREE_MAX_FRUITS, TREE_MAX_EVENT_FRUITS, TREE_MAX_STATE_LENGTH } from "./limits";
+
 export const TREE_HTML = String.raw`<!doctype html>
 <html lang="en">
 <head>
@@ -225,6 +229,12 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
   const tree = buildTree(11);
   const CAP = tree.buds.length;
 
+${FRUIT_RUNTIME}
+  const fruitLayer = createFruitLayer();
+${LIGHT_RUNTIME}
+  const bundleLightLayer = createBundleLightLayer();
+  let lightBundles = null;
+
   const scene = document.getElementById("scene");
   const cv = document.getElementById("sky");
   const ctx = cv.getContext("2d");
@@ -313,6 +323,7 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
   }
 
   let t = 0,
+    targetTime = 0,
     answerCount = 0,
     lanternCount = 0,
     initialized = false;
@@ -701,6 +712,9 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
       ctx.fill();
     }
 
+    fruitLayer.draw(ctx, { buds, unit: U, rootX: baseX, rootY: groundY + 3, glow }, clockT, still);
+    bundleLightLayer.draw(ctx, { buds, unit: U, rootX: baseX, rootY: groundY + 3, width: W, height: H, glow, night: nf }, clockT, still);
+
     if (
       selected >= 0 &&
       buds[selected] &&
@@ -767,7 +781,7 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
     ctx.globalAlpha = 1;
 
     ctx.restore();
-    if (nf > 0.2 && !still) {
+    if (nf > 0.2 && !still && lightBundles === null) {
       ctx.save();
       ctx.translate(-px * 46, -py * 14);
       ctx.fillStyle = "#ffe6a8";
@@ -879,13 +893,14 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
       lastTs = performance.now();
     }
     if (still) {
+      t = targetTime;
       bloom = bloomTarget;
       clearTransient();
     }
     schedule(true);
   }
   function receive(event) {
-    if (typeof event.data !== "string" || event.data.length > 100000) return;
+    if (typeof event.data !== "string" || event.data.length > ${TREE_MAX_STATE_LENGTH}) return;
     let value;
     try {
       value = JSON.parse(event.data);
@@ -911,7 +926,10 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
       !Array.isArray(value.mine) ||
       !Array.isArray(value.notes) ||
       !Number.isInteger(value.lanterns) ||
-      value.lanterns < 0
+      value.lanterns < 0 ||
+      (value.lightBundles !== undefined && (!Number.isInteger(value.lightBundles) || value.lightBundles < 0 || value.lightBundles > 1000)) ||
+      (Array.isArray(value.fruits) && value.fruits.length > ${TREE_MAX_FRUITS}) ||
+      (Array.isArray(value.wateringEvent?.fruitIds) && value.wateringEvent.fruitIds.length > ${TREE_MAX_EVENT_FRUITS})
     )
       return;
     const nextT = clamp(value.timeOfDay, 0, 1),
@@ -921,7 +939,7 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
     value.mine.slice(0, CAP).forEach(function (i) {
       if (validIndex(i)) nextMine[i] = true;
     });
-    const reset = initialized && (nextCount < answerCount || nextT < t);
+    const reset = initialized && (nextCount < answerCount || nextT < targetTime);
     if (reset) clearTransient();
     const arrivals = [];
     if (initialized && !reset) {
@@ -929,7 +947,7 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
         if (i >= answerCount || (nextMine[i] && !mine[i])) arrivals.push(i);
       }
     }
-    t = nextT;
+    targetTime = nextT;
     answerCount = nextCount;
     mine = nextMine;
     lanternCount = Math.min(64, value.lanterns);
@@ -957,10 +975,16 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
     nativeStill = value.reduceMotion === true;
     still = nativeStill || media.matches;
     active = value.active !== false;
-    bloomTarget = bloomAt(t);
+    if (!initialized || reset || still) t = targetTime;
+    bloomTarget = bloomAt(targetTime);
     if (!initialized || reset || still) bloom = bloomTarget;
     revision = value.revision;
     initialized = true;
+    fruitLayer.update(value.fruits, value.lightBundles !== undefined || value.lightEvent !== undefined ? null : value.wateringEvent, animationTime(), still);
+    if (value.lightBundles !== undefined) {
+      lightBundles = value.lightBundles;
+      bundleLightLayer.update(lightBundles, value.goldenLightBundles, value.lightEvent, animationTime(), still);
+    }
     if (!still)
       arrivals.slice(-12).forEach(function (i) {
         if (pending[i]) return;
@@ -1006,10 +1030,10 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
       x = event.clientX - r.left + px * 30,
       y = event.clientY - r.top + py * 9;
     let best = -1,
-      distance = 26 * 26;
+      distance = 160 * 160;
     for (let i = 0; i < answerCount; i++) {
       const d = tree.buds[i];
-      if (!d.shown || d.open < 0.5 || pending[i]) continue;
+      if (!d) continue;
       const q = (d.x - x) * (d.x - x) + (d.y - y) * (d.y - y);
       if (q < distance) {
         distance = q;
@@ -1057,6 +1081,8 @@ html, body, #scene { margin: 0; width: 100%; height: 100%; overflow: hidden; bac
       const dt = Math.min(0.1, elapsed);
       lastTs = lastPaint = ts;
       clockT += elapsed;
+      t += (targetTime - t) * (1 - Math.exp(-elapsed * 3.6));
+      if (Math.abs(targetTime - t) < 0.0001) t = targetTime;
       px += (tpx - px) * Math.min(1, dt * 4);
       py += (tpy - py) * Math.min(1, dt * 4);
       bloom += (bloomTarget - bloom) * (1 - Math.exp(-elapsed * 2.8));

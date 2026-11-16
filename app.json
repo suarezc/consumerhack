@@ -9,7 +9,10 @@
     "userInterfaceStyle": "light",
     "backgroundColor": "#0b1030",
     "ios": {
-      "bundleIdentifier": "com.charlessuarez.storytime"
+      "bundleIdentifier": "com.charlessuarez.storytime",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -33,17 +36,23 @@
           "imageWidth": 200
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "enableRemoteNotifications": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
+    "owner": "suarezc",
     "extra": {
       "eas": {
         "projectId": "9c1d5974-abc5-4039-912c-7b79809cd460"
       }
-    },
-    "owner": "suarezc"
+    }
   }
 }

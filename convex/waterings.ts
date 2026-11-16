@@ -8,7 +8,7 @@ import { ensureMemberUser } from "./identity";
 
 export const checkout = action({
   args: { deviceId: v.string(), treeId: v.id("trees"), dayId: v.id("days"),
-    bundles: v.union(v.literal(2), v.literal(5), v.literal(10)), answerId: v.optional(v.id("answers")) },
+    bundles: v.number(), answerId: v.optional(v.id("answers")) },
   handler: async (ctx, args): Promise<{ wateringId: Id<"lanterns">; checkoutUrl: string }> => {
     return await ctx.runAction(internal.lanterns.createWateringCheckout, args);
   },
@@ -16,7 +16,7 @@ export const checkout = action({
 
 export const demoWater = mutation({
   args: { deviceId: v.string(), treeId: v.id("trees"), dayId: v.optional(v.id("days")), runId: v.optional(v.id("days")),
-    bundles: v.optional(v.union(v.literal(2), v.literal(5), v.literal(10))), amountCents: v.optional(v.number()), requestId: v.optional(v.string()) },
+    bundles: v.optional(v.number()), amountCents: v.optional(v.number()), requestId: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const { deviceId, treeId } = args;
     const bundles = args.bundles ?? (args.amountCents ?? NaN) / 50;

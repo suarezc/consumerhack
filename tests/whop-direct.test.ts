@@ -103,7 +103,7 @@ it("uses exactly one cent only when explicitly selected; never falls back after 
   methods.checkoutConfigurations.create.mockClear().mockRejectedValueOnce(new Error("unrelated provider error"));
   await expect(createDirectCheckout(client, input)).rejects.toThrow("unrelated");
   expect(methods.checkoutConfigurations.create).toHaveBeenCalledTimes(1);
-  for (const change of [{ bundles: 3 }, { applicationFeeCents: 2 }, { userId: "" }, { recipientAccountId: "invalid" }]) {
+  for (const change of [{ bundles: 101 }, { applicationFeeCents: 2 }, { userId: "" }, { recipientAccountId: "invalid" }]) {
     await expect(createDirectCheckout(client, { ...input, ...change } as DirectCheckoutInput)).rejects.toThrow();
   }
 });

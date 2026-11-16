@@ -46,7 +46,7 @@ const paymentArgs = {
 
 export const wateringArgs = {
   deviceId: v.string(), treeId: v.id("trees"), dayId: v.optional(v.id("days")),
-  bundles: v.union(v.literal(2), v.literal(5), v.literal(10)), answerId: v.optional(v.id("answers")),
+  bundles: v.number(), answerId: v.optional(v.id("answers")),
 };
 
 export const prepareWatering = internalMutation({
@@ -207,7 +207,7 @@ export const checkout = action({
     const bundles = args.amountCents / 50;
     bundleCents(bundles);
     const result = await ctx.runAction(internal.lanterns.createWateringCheckout, {
-      deviceId: args.deviceId, treeId: args.treeId, answerId: args.answerId, bundles: bundles as 2 | 5 | 10,
+      deviceId: args.deviceId, treeId: args.treeId, answerId: args.answerId, bundles,
     });
     return { lanternId: result.wateringId, checkoutUrl: result.checkoutUrl };
   },

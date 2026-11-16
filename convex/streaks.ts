@@ -51,12 +51,15 @@ export async function userSummary(ctx: ReadCtx, deviceId: string, run: Doc<"days
 }
 
 export async function dayGiving(ctx: ReadCtx, day: Doc<"days">, viewer: Id<"members">, run: Doc<"days"> | null, ownOnly = false) {
-  const date = day.ritualDate ?? day.date;
   const rows = (await ctx.db.query("lanterns").withIndex("by_tree", q => q.eq("treeId", day.treeId)).collect())
     .filter(row => paidForDay(row, day) && (!ownOnly || row.memberId === viewer));
+  let lightBundles = 0;
+  let goldenLightBundles = 0;
   const datesByMember = new Map<string, Set<string>>();
-  const fruits = [];
-  for (const row of rows.sort((a, b) => (a.paidAt ?? a.createdAt) - (b.paidAt ?? b.createdAt) || a._id.localeCompare(b._id))) {
+  for (const row of rows) {
+    const bundles = bundleCount(row);
+    lightBundles += bundles;
+    if (bundles === 0) continue;
     let dates = datesByMember.get(row.memberId);
     if (!dates) {
       const member = await ctx.db.get(row.memberId);
@@ -64,16 +67,12 @@ export async function dayGiving(ctx: ReadCtx, day: Doc<"days">, viewer: Id<"memb
       dates = (await userContributions(ctx, member.deviceId, run)).givingDates;
       datesByMember.set(row.memberId, dates);
     }
-    const reached = milestone(dates, date);
-    for (let index = 0; index < bundleCount(row); index++) {
-      fruits.push({ fruitId: `${row._id}:${index}`, date, golden: reached !== null, isMine: row.memberId === viewer,
-        milestone: reached, source: row.source ?? "whop" as const, paidAt: row.paidAt ?? null });
-    }
+    if (milestone(dates, day.ritualDate ?? day.date) !== null) goldenLightBundles += bundles;
   }
   const latest = rows.filter(row => row.memberId === viewer && row.confirmedAt !== undefined && bundleCount(row) > 0)
     .sort((a, b) => a.confirmedAt! - b.confirmedAt! || a._id.localeCompare(b._id)).at(-1);
-  const fruitIds = latest ? Array.from({ length: bundleCount(latest) }, (_, index) => `${latest._id}:${index}`) : [];
-  return { fruits, wateringEvent: latest ? { id: latest._id, fruitId: fruitIds[0], fruitIds, revision: 1 } : null };
+  return { lightBundles, goldenLightBundles,
+    lightEvent: latest ? { id: latest._id, lightBundles: bundleCount(latest), revision: 2 as const } : null };
 }
 
 export const summary = query({
