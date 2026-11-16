@@ -1,7 +1,7 @@
 import { useAction } from "convex/react";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useRef, useState } from "react";
-import { Platform, Pressable, View } from "react-native";
+import { Animated, Easing, Platform, Pressable, View } from "react-native";
 
 import { Panel } from "@/components/screens/Scene";
 import { StoryButton, StoryText } from "@/design";
@@ -9,10 +9,27 @@ import type { Today } from "@/providers/RitualProvider";
 import { useSession } from "@/providers/SessionProvider";
 import { api } from "@/services/api";
 
-export function WateringComposer({ today, onClose, onPaid }: {
+function Firefly({ index }: { index: number }) {
+  const [progress] = useState(() => new Animated.Value(0));
+  useEffect(() => {
+    const loop = Animated.loop(Animated.timing(progress, { toValue: 1, duration: 4200 + (index * 733) % 3600, easing: Easing.linear, useNativeDriver: Platform.OS !== "web" }));
+    loop.start();
+    return () => loop.stop();
+  }, [progress, index]);
+  const seed = (n: number) => { const value = Math.sin(index * 12.9898 + n * 78.233) * 43758.5453; return value - Math.floor(value); };
+  const drift = (n: number, reach: number) => progress.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1],
+    outputRange: [0, reach * (seed(n) - 0.5), reach * (seed(n + 1) - 0.5), reach * (seed(n + 2) - 0.5), 0] });
+  return <Animated.View style={{ position: "absolute", left: `${4 + seed(7) * 92}%`, top: `${8 + seed(8) * 84}%`, width: 6, height: 6, borderRadius: 3,
+    backgroundColor: "#ffd27a", shadowColor: "#ffd27a", shadowOpacity: 0.9, shadowRadius: 6, shadowOffset: { width: 0, height: 0 },
+    opacity: progress.interpolate({ inputRange: [0, 0.2, 0.5, 0.8, 1], outputRange: [0.35, 1, 0.5, 1, 0.35] }),
+    transform: [{ translateX: drift(1, 70) }, { translateY: drift(4, 44) }] }} />;
+}
+
+export function WateringComposer({ today, onClose, onPaid, onPreview }: {
   today: Today;
   onClose: () => void;
   onPaid: (fireflies: number) => void;
+  onPreview: (fireflies: number) => void;
 }) {
   const { session } = useSession();
   const checkout = useAction(api.waterings.checkout);
@@ -28,6 +45,11 @@ export function WateringComposer({ today, onClose, onPaid }: {
     if (Platform.OS === "ios") void WebBrowser.dismissBrowser().catch(() => undefined);
     onPaid(dollars);
   }, [paid, dollars, onPaid]);
+
+  useEffect(() => {
+    onPreview(paid ? 0 : dollars);
+    return () => onPreview(0);
+  }, [dollars, paid, onPreview]);
 
   async function prepare() {
     if (!session || !today.myAnswer || pending.current) return;
@@ -49,6 +71,9 @@ export function WateringComposer({ today, onClose, onPaid }: {
   const step = (by: number) => { if (!busy) setDollars((value) => Math.max(1, Math.min(50, value + by))); };
   const round = { width: 52, height: 52, borderRadius: 26, borderWidth: 1, borderColor: "#6f6a78", alignItems: "center", justifyContent: "center" } as const;
   return <Panel title="A little care, together." onClose={() => { if (!busy) onClose(); }}>
+    <View pointerEvents="none" style={{ height: 88 }}>
+      {Array.from({ length: dollars }, (_, index) => <Firefly key={index} index={index} />)}
+    </View>
     {!checkoutUrl && <>
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 24 }}>
         <Pressable accessibilityRole="button" accessibilityLabel="One dollar less" onPress={() => step(-1)} style={round}><StoryText color="#f6efe6" style={{ fontSize: 26, lineHeight: 30 }}>−</StoryText></Pressable>

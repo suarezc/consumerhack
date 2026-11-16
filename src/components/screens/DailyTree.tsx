@@ -17,6 +17,8 @@ import { api } from "@/services/api";
 import { mutationError } from "@/services/errors";
 import { bloomLabel } from "@/services/ritual";
 
+const launch = { fresh: true };
+
 export function DailyTree({ bloom = false }: { bloom?: boolean }) {
   const { today } = useRitual();
   if (!today) return <LoadingDay />;
@@ -68,10 +70,13 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
   const lastRead = useRef(-1);
   const [fireflies, setFireflies] = useState(0);
   const [shareOpen, setShareOpen] = useState(false);
+  const [preview, setPreview] = useState(0);
+  const [answeredBeforeLaunch] = useState(() => launch.fresh && today.myAnswer !== null);
+  useEffect(() => { launch.fresh = false; }, []);
   const deviceId = session?.deviceId;
   const treeId = today.tree.treeId;
-  const needsSample = today.tree.isHost && !today.myAnswer && !sampleFailed
-    && (!today.day.isDemo || today.day.bloomedAt !== undefined || now >= today.day.bloomAt);
+  const needsSample = today.tree.isHost && !sampleFailed && (answeredBeforeLaunch
+    || (!today.myAnswer && (!today.day.isDemo || today.day.bloomedAt !== undefined || now >= today.day.bloomAt)));
   useEffect(() => {
     if (!needsSample || !deviceId || sampleStarted.current) return;
     sampleStarted.current = true;
@@ -128,7 +133,7 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
       <FruitDetailStatus status={fruitStatus} fruitCount={fruits.length} />
     </View>}
     tree={{ answers: today.answerCount, mine: today.myAnswer ? [today.myAnswer.blossom] : [], notes, lanterns: 0, onTapBlossom: choose,
-      fruits, lightBundles: Math.ceil(today.lightBundles / 2), goldenLightBundles: Math.ceil(today.goldenLightBundles / 2),
+      fruits, lightBundles: Math.ceil(today.lightBundles / 2) + preview, goldenLightBundles: Math.ceil(today.goldenLightBundles / 2),
       lightEvent: watering.treeEvent && { ...watering.treeEvent, lightBundles: Math.ceil(watering.treeEvent.lightBundles / 2) } }}
     overlay={(controlsHeight) => (
     <AnswerCard controlsHeight={controlsHeight} open={selected !== null} answer={selected && { id: selected.answerId, text: selected.text, author: selected.name, isMine: selected.memberId === today.member.memberId }}
@@ -176,7 +181,7 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
       }} />
     </Panel>}
     {wateringOpen && <WateringComposer today={today} onClose={() => setWateringOpen(false)}
-      onPaid={(added) => { setWateringOpen(false); setFireflies((count) => count + added); }} />}
+      onPreview={setPreview} onPaid={(added) => { setWateringOpen(false); setFireflies((count) => count + added); }} />}
     {shareOpen && <Panel title="Your fireflies." onClose={() => setShareOpen(false)}>
       <StoryText color="#ffd27a" style={{ fontSize: 72, lineHeight: 80, textAlign: "center" }}>{fireflies}</StoryText>
       <StoryText color="#f6efe6" style={{ textAlign: "center" }}>{fireflies === 1 ? "firefly" : "fireflies"} on today’s tree are yours. Each one is a dollar for S.A.C.K.</StoryText>
