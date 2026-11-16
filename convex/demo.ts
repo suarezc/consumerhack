@@ -62,6 +62,24 @@ export const restart = mutation({
       }
       await refreshClosedImpact(ctx, historyId);
     }
+    const friends = (await ctx.db.query("members").withIndex("by_tree", q => q.eq("treeId", treeId)).collect()).filter(member => member.demoHistory);
+    for (let offset = -9; offset < -3; offset++) {
+      const date = shiftDate(ritualDate, offset);
+      const start = Date.parse(`${date}T06:00:00Z`);
+      const historyId = await ctx.db.insert("days", { treeId, date: `demo:${dayId}:${date}`, ritualDate: date,
+        question: questionFor(date), opensAt: start, bloomAt: start + 15 * 60 * 60 * 1000,
+        bloomedAt: start + 15 * 60 * 60 * 1000, closedAt: start + DAY_MS,
+        isDemo: true, demoRunId: dayId, charity: sackCharity, causeId });
+      let blossom = 0;
+      if (offset !== -4) await ctx.db.insert("answers", { dayId: historyId, treeId, memberId: host!._id, userId,
+        text: samples[(offset + 9) % samples.length].text, blossom: blossom++, createdAt: start + DAY_MS / 4 });
+      for (const friend of friends.slice(0, 6 + ((offset + 9) * 5) % 17)) {
+        const friendUser = await ensureMemberUser(ctx, friend);
+        await ctx.db.insert("answers", { dayId: historyId, treeId, memberId: friend._id, userId: friendUser,
+          text: samples[blossom % samples.length].text, blossom: blossom++, createdAt: start + DAY_MS / 4 });
+      }
+      await refreshClosedImpact(ctx, historyId);
+    }
     for (let index = 0; index < samples.length; index++) {
       const sample = samples[index];
       const sampleDevice = `$demo:${treeId}:${index}`;
