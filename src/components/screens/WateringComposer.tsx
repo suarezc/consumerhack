@@ -41,7 +41,7 @@ export function WateringComposer({ today, onClose }: {
         setCheckoutUrl(result.checkoutUrl);
       }
     } catch {
-      setError(today.day.isDemo ? "The sample watering wasn’t confirmed. Retry this choice to safely check the same request." : "Sandbox checkout isn’t available. No payment success has been confirmed. Please try again later.");
+      setError(today.day.isDemo ? "That didn’t go through. Please try again." : "Checkout isn’t available right now. Please try again.");
     } finally {
       setBusy(false);
       pending.current = false;
@@ -55,7 +55,7 @@ export function WateringComposer({ today, onClose }: {
       if (next !== bundles) demoRequest.reset();
       setError("");
     }} onWater={() => { void prepare(); }} canWater={today.myAnswer !== null} loading={busy} error={error} isDemo={today.day.isDemo} />}
-    {checkoutUrl && <StoryButton label="Open secure sandbox checkout" loading={busy} onPress={() => {
+    {checkoutUrl && <StoryButton label="Open secure checkout" loading={busy} onPress={() => {
       setBusy(true);
       setError("");
       void WebBrowser.openBrowserAsync(checkoutUrl).then(() => setOpened(true)).catch(() => setError("The browser couldn’t open. Please try the checkout button again.")).finally(() => setBusy(false));

@@ -24,7 +24,7 @@ function KindredAnswers() {
       : result.status === "pending" ? <ScreenState status="loading" title="Finding a shared feeling…" message="The judges are still listening. Your kindred answers will appear here." />
       : result.matches.length === 0 ? <Empty title="A quiet day." message="No kindred answers were found for this day. Your circle is still waiting in Bloom." />
       : <>
-        <StoryText variant="caption">{today.day.isDemo ? "Demo matches · sample answers from sample trees." : `${result.matches.length} kindred ${result.matches.length === 1 ? "answer" : "answers"} from other trees. Up to three, when a shared feeling is found.`}</StoryText>
+        <StoryText variant="caption">{`${result.matches.length} kindred ${result.matches.length === 1 ? "answer" : "answers"} from other trees. Up to three, when a shared feeling is found.`}</StoryText>
         {result.matches.map((match) => <View key={match.answerId} style={{ padding: 20, gap: 12, borderWidth: 1, borderColor: theme.line, backgroundColor: theme.panel }}>
           <StoryText variant="meta" color={theme.muted}>{match.treeName}</StoryText>
           <StoryText variant="question" color={theme.paper}>{match.text}</StoryText>

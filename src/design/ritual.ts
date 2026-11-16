@@ -59,5 +59,5 @@ export function claimGivingEvent(baselineId: string | null, event: ConfirmedGivi
 
 export function describeFruit(fruit: ViewerFruit) {
   const milestone = fruit.golden && fruit.milestone ? ` for the ${fruit.milestone}-day giving milestone` : '';
-  return `${fruit.source === 'demo' ? 'Sample ' : ''}${fruit.golden ? 'golden fruit' : 'fruit'}${milestone}`;
+  return `${fruit.golden ? 'golden fruit' : 'fruit'}${milestone}`;
 }

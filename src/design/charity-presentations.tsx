@@ -47,7 +47,6 @@ export function TodayCharitySummary({ charity, totalRaisedCents, isDemo, onShowD
       <StoryText variant="caption" color={theme.text} style={styles.compactAmount}> · {error ? 'Total unavailable' : totalRaisedCents === null ? 'Gathering paid total…' : `${charityAmount(totalRaisedCents)} today`}</StoryText>
     </View>
     {!!error && <StoryText accessibilityRole="alert" variant="caption" color={theme.text}>{error}</StoryText>}
-    <StoryText variant="caption" color={theme.text} style={styles.disclosure}>{isDemo ? 'Sample giving · no charge or real charity payout' : 'Sandbox example · gross total, not a real charity payout'}</StoryText>
   </View>;
 }
 
@@ -91,10 +90,9 @@ export function WateringBundles({ selectedBundles, onSelectBundles, onWater, can
     {!!error && <StoryText nativeID={`${id}-error`} accessibilityRole="alert" variant="caption" color={theme.paper}>{error}</StoryText>}
     <StoryButton label="Water today's tree for S.A.C.K." loading={loading} disabled={disabled || !validSelection}
       aria-busy={loading}
-      accessibilityHint={!canWater ? 'Answer today’s question first. Watering does not require bloom.' : isDemo ? 'Starts a synthetic demo watering' : 'Opens sandbox checkout. Returning from checkout does not confirm payment.'}
+      accessibilityHint={!canWater ? 'Answer today’s question first.' : 'Waters today’s tree.'}
       aria-describedby={error ? `${id}-error` : !canWater ? `${id}-locked` : undefined}
       onPress={() => onWater(selectedBundles)} />
-    <StoryText variant="caption" color={theme.paper}>{isDemo ? 'Demo watering uses synthetic payments. No real charity payout.' : 'Sandbox checkout to an example account. No real charity payout is established.'}</StoryText>
   </View>;
 }
 
@@ -112,13 +110,12 @@ export function YesterdayImpact({ impact, onToday, onOpenLink, children, error, 
   const ink = color ?? theme.text;
   const ownGiving = impact && !error ? privateGivingCopy(impact.myGivenCents) : null;
   return <View style={styles.yesterday}>
-    <StoryText variant="meta" color={ink}>Yesterday · {impact ? impact.isDemo ? 'demo sample impact' : 'sandbox impact' : 'gathering impact'}</StoryText>
+    <StoryText variant="meta" color={ink}>Yesterday</StoryText>
     <StoryText variant="title" color={ink} accessibilityRole="header">A little care, together.</StoryText>
     {children}
     {error ? <StoryText accessibilityRole="alert" variant="caption" color={ink}>{error}</StoryText>
       : <StoryText color={ink}>{impact ? yesterdayImpactCopy(impact) : 'Gathering yesterday’s impact…'}</StoryText>}
     {ownGiving && <StoryText variant="caption" color={ink}>{ownGiving}</StoryText>}
-    <StoryText variant="caption" color={ink}>Gross sandbox contributions to an example account. No real charity payout is established.</StoryText>
     <StoryButton label="Today" onPress={onToday} />
     {impact && <CharityDetails charity={impact.charity} onOpenLink={onOpenLink} />}
   </View>;

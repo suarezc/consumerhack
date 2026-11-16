@@ -1027,7 +1027,7 @@ ${LIGHT_RUNTIME}
       x = event.clientX - r.left + px * 30,
       y = event.clientY - r.top + py * 9;
     let best = -1,
-      distance = 26 * 26;
+      distance = 160 * 160;
     for (let i = 0; i < answerCount; i++) {
       const d = tree.buds[i];
       if (!d.shown || d.open < 0.5 || pending[i]) continue;

@@ -74,7 +74,7 @@ export function GivingWidget(props: WidgetProps, environment: WidgetEnvironment)
             <Text modifiers={[font({ family: bodyFont, weight: "semibold", size: 20 }), foregroundStyle(ink), lineLimit(1), minimumScaleFactor(0.6)]}>{props.totalLabel}</Text>
             <Text modifiers={[font({ family: bodyFont, size: 11 }), foregroundStyle(muted), lineLimit(2)]}>raised today for S.A.C.K.</Text>
             <Text modifiers={[font({ family: bodyFont, size: 11 }), foregroundStyle(muted)]}>{props.answersLabel}</Text>
-            <Text modifiers={[font({ family: bodyFont, size: 8 }), foregroundStyle(muted), lineLimit(2)]}>Sandbox gross · {props.freshnessLabel}</Text>
+            <Text modifiers={[font({ family: bodyFont, size: 8 }), foregroundStyle(muted), lineLimit(2)]}>{props.freshnessLabel}</Text>
           </VStack>
         </HStack>
       </HStack>
