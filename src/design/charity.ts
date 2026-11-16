@@ -31,7 +31,7 @@ export function charityAmount(cents: number) {
 export function yesterdayImpactCopy(impact: YesterdayImpactData) {
   if (![impact.answererCount, impact.watererCount, impact.totalRaisedCents]
     .every(value => Number.isSafeInteger(value) && value >= 0)) return 'Yesterday’s impact is unavailable.';
-  return `${impact.answererCount} ${impact.answererCount === 1 ? 'person' : 'people'} answered, ${impact.watererCount} watered, ${charityAmount(impact.totalRaisedCents)} raised for ${impact.charity.name}${impact.charity.name.endsWith('.') ? '' : '.'}`;
+  return `${impact.answererCount} ${impact.answererCount === 1 ? 'person' : 'people'} answered, ${impact.watererCount} gave, ${charityAmount(impact.totalRaisedCents)} raised for ${impact.charity.name}${impact.charity.name.endsWith('.') ? '' : '.'}`;
 }
 
 export function privateGivingCopy(cents?: number | null) {

@@ -13,12 +13,12 @@ describe('charity presentation', () => {
   });
 
   it('uses distinct-person counts supplied by the server, not fruit or payment counts', () => {
-    expect(yesterdayImpactCopy(impact)).toBe('40 people answered, 12 watered, $6.50 raised for S.A.C.K.');
-    expect(yesterdayImpactCopy({ ...impact, answererCount: 1, watererCount: 1 })).toContain('1 person answered, 1 watered');
+    expect(yesterdayImpactCopy(impact)).toBe('40 people answered, 12 gave, $6.50 raised for S.A.C.K.');
+    expect(yesterdayImpactCopy({ ...impact, answererCount: 1, watererCount: 1 })).toContain('1 person answered, 1 gave');
   });
 
   it('preserves a known zero total and zero activity', () => {
-    expect(yesterdayImpactCopy({ ...impact, answererCount: 0, watererCount: 0, totalRaisedCents: 0 })).toContain('0 people answered, 0 watered, $0.00');
+    expect(yesterdayImpactCopy({ ...impact, answererCount: 0, watererCount: 0, totalRaisedCents: 0 })).toContain('0 people answered, 0 gave, $0.00');
     expect(charityAmount(0)).toBe('$0.00');
   });
 

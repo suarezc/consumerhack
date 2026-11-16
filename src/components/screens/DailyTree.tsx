@@ -150,7 +150,7 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
     {today.myAnswer && !unlocked && <StoryText variant="caption" color={detailUnavailable ? theme.text : theme.paper}>Your answer is planted.</StoryText>}
     {!today.myAnswer && !canAnswer && <StoryText color={detailUnavailable ? theme.text : theme.paper}>{now < today.day.opensAt ? "The question opens soon." : "This day has closed. Come back for tomorrow’s question."}</StoryText>}
     {today.tree.isHost && !today.myAnswer && !canAnswer && <StoryButton label="Start a fresh day" tone="quiet" loading={busy} onPress={freshDay} />}
-    {today.myAnswer && <StoryButton label="Water today's tree for S.A.C.K." style={productSceneStyles.primary} onPress={() => setWateringOpen(true)} />}
+    {today.myAnswer && <StoryButton label="Support S.A.C.K." style={productSceneStyles.primary} onPress={() => setWateringOpen(true)} />}
     <TreeNavigation hill={!detailUnavailable} compact />
     {!!error && !composer && !selected && !settings && <StoryText color="#ffd27a" accessibilityRole="alert">{error}</StoryText>}
     {composer && <Panel title="What’s on your mind?" onClose={() => { if (!busy) setComposer(false); }}>

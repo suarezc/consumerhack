@@ -17,7 +17,7 @@ export function RemindersSettings() {
     : "Reminder settings couldn’t be confirmed. Reconnect and try again.";
 
   return <View style={{ gap: 12 }}>
-    <StoryText variant="meta" color="#f6efe6">Watering reminders</StoryText>
+    <StoryText variant="meta" color="#f6efe6">Reminders</StoryText>
     <StoryText variant="caption" color="#c6c1c2" accessibilityLiveRegion="polite">{message}</StoryText>
     <StoryText variant="caption" color="#c6c1c2">Optional. After bloom, a reminder can help you continue yesterday’s giving streak.</StoryText>
     {status && status.state !== "registered" && <StoryButton
