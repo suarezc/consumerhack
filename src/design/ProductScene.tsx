@@ -40,7 +40,7 @@ export function ProductScene({ tree, title, meta, underQuestion, detail, onPress
         <StoryText variant="question" color={theme.text} accessibilityRole="header" style={styles.question}>{title}</StoryText>
         {underQuestion}
         {!!detail && (onPressDetail
-          ? <Pressable accessibilityRole="button" onPress={onPressDetail} style={{ minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }}>
+          ? <Pressable accessibilityRole="button" onPress={onPressDetail} hitSlop={14} style={{ alignSelf: 'flex-start' }}>
             <StoryText variant="caption" color={theme.text} style={{ fontSize: 14, lineHeight: 20, textDecorationLine: 'underline' }}>{detail}</StoryText>
           </Pressable>
           : <StoryText variant="caption" color={theme.text} style={{ fontSize: 14, lineHeight: 20 }}>{detail}</StoryText>)}

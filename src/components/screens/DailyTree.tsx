@@ -51,6 +51,7 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
   const detailUnavailable = fruitStatus.status === "unavailable";
   const [sampleFailed, setSampleFailed] = useState(false);
   const sampleStarted = useRef(false);
+  const lastRead = useRef(-1);
   const deviceId = session?.deviceId;
   const treeId = today.tree.treeId;
   const needsSample = today.tree.isHost && !today.myAnswer && !sampleFailed
@@ -83,7 +84,9 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
 
   function readNext() {
     const blossoms = today.answers.map((answer) => answer.blossom).sort((a, b) => a - b);
-    if (unlocked && blossoms.length) choose(blossoms[(blossoms.indexOf(selectedIndex ?? -1) + 1) % blossoms.length]);
+    if (!unlocked || !blossoms.length) return;
+    lastRead.current = blossoms[(blossoms.indexOf(lastRead.current) + 1) % blossoms.length];
+    choose(lastRead.current);
   }
 
   function choose(index: number) {

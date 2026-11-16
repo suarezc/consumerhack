@@ -1,5 +1,5 @@
-export function ritualTime(now: number, day?: { isDemo: boolean; opensAt: number; bloomAt: number } | null) {
-  if (day?.isDemo) return Math.max(0, Math.min(1, (now - day.opensAt) / 60_000));
+export function ritualTime(now: number, day?: { isDemo: boolean; opensAt: number; bloomAt: number; bloomedAt?: number } | null) {
+  if (day?.isDemo) return day.bloomedAt !== undefined ? 1 : Math.max(0, Math.min(1, (now - day.opensAt) / 60_000));
   const date = new Date(now);
   return Math.max(0, Math.min(1, (date.getUTCHours() + date.getUTCMinutes() / 60 - 6) / 15));
 }
