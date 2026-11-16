@@ -1,16 +1,17 @@
 import { useFonts } from 'expo-font';
 
 export const fontFamilies = {
-  voice: 'Newsreader_400Regular',
-  italic: 'Newsreader_300Light_Italic',
-  meta: 'IBMPlexMono_400Regular',
+  voice: 'Alegreya_400Regular',
+  meta: 'SourceSans3_400Regular',
+  text: 'SourceSans3_400Regular',
+  control: 'SourceSans3_600SemiBold',
 } as const;
 
 export function useStoryTimeFonts() {
   const [loaded, error] = useFonts({
-    [fontFamilies.voice]: require('../../assets/fonts/Newsreader-Regular.ttf'),
-    [fontFamilies.italic]: require('../../assets/fonts/Newsreader-LightItalic.ttf'),
-    [fontFamilies.meta]: require('../../assets/fonts/IBMPlexMono-Regular.ttf'),
+    [fontFamilies.voice]: require('../../assets/fonts/Alegreya-Regular.ttf'),
+    [fontFamilies.text]: require('../../assets/fonts/SourceSans3-Regular.ttf'),
+    [fontFamilies.control]: require('../../assets/fonts/SourceSans3-SemiBold.ttf'),
   });
 
   return { loaded, error };

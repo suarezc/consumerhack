@@ -10,19 +10,18 @@ import { fontFamilies } from './fonts';
 import { useStoryTime } from './provider';
 
 export type StoryTextProps = TextProps & {
-  variant?: 'title' | 'question' | 'body' | 'caption' | 'meta';
+  variant?: 'title' | 'question' | 'body' | 'caption' | 'meta' | 'control';
   color?: string;
 };
 
 export function StoryText({ variant = 'body', color, style, ...props }: StoryTextProps) {
   const { theme, fontsLoaded } = useStoryTime();
-  const family = variant === 'meta' ? 'meta' : variant === 'question' ? 'italic' : 'voice';
-  const fallback = family === 'meta' ? Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' })
-    : Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' });
+  const family = variant === 'title' || variant === 'question' ? 'voice' : variant === 'control' ? 'control' : 'text';
+  const fallback = family === 'voice' ? Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia' })
+    : Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' });
   return <Text {...props} style={[
     styles[variant],
     { color: color ?? theme.text, fontFamily: fontsLoaded ? fontFamilies[family] : fallback },
-    !fontsLoaded && variant === 'question' && { fontStyle: 'italic' },
     style,
   ]} />;
 }
@@ -44,7 +43,7 @@ export function StoryButton({ label, loading = false, disabled, tone = 'primary'
       opacity: disabled ? 0.45 : state.pressed ? 0.75 : 1,
     }, typeof style === 'function' ? style(state) : style]}>
     {loading && <ActivityIndicator size="small" color={primary ? theme.panel : theme.paper} />}
-    <StoryText variant="meta" color={primary ? theme.panel : theme.paper} style={styles.buttonLabel}>{label}</StoryText>
+    <StoryText variant="control" color={primary ? theme.panel : theme.paper} style={styles.buttonLabel}>{label}</StoryText>
   </Pressable>;
 }
 
@@ -89,7 +88,7 @@ export function StoryField({ label, error, labelColor, errorColor, style, ...pro
       accessibilityHint={error ?? props.accessibilityHint} aria-describedby={error ? id : undefined}
       placeholderTextColor={theme.muted} selectionColor={theme.lantern}
       style={[styles.input, { color: theme.paper, borderColor: error ? theme.lantern : theme.line,
-        backgroundColor: theme.panel, fontFamily: fontsLoaded ? fontFamilies.voice : undefined }, style]} />
+        backgroundColor: theme.panel, fontFamily: fontsLoaded ? fontFamilies.text : undefined }, style]} />
     {!!error && <StoryText nativeID={id} accessibilityRole="alert" variant="caption" color={errorColor}>{error}</StoryText>}
   </View>;
 }
@@ -116,11 +115,12 @@ const styles = StyleSheet.create({
   hill: { position: 'absolute', width: '160%', height: '40%', left: '-30%', bottom: '-16%', borderTopLeftRadius: 400, borderTopRightRadius: 500 },
   scrollContent: { flexGrow: 1 },
   content: { flexGrow: 1, width: '100%', maxWidth: 560, alignSelf: 'center', padding: 24, gap: 24 },
-  title: { fontSize: 34, lineHeight: 39, letterSpacing: -0.5 },
-  question: { fontSize: 32, lineHeight: 38, letterSpacing: -0.3 },
-  body: { fontSize: 20, lineHeight: 28 },
+  title: { fontSize: 34, lineHeight: 41 },
+  question: { fontSize: 32, lineHeight: 40 },
+  body: { fontSize: 18, lineHeight: 26 },
   caption: { fontSize: 16, lineHeight: 23 },
-  meta: { fontSize: 11, lineHeight: 17, letterSpacing: 1.4, textTransform: 'uppercase' },
+  meta: { fontSize: 13, lineHeight: 19 },
+  control: { fontSize: 16, lineHeight: 22 },
   button: { minHeight: 48, paddingHorizontal: 20, paddingVertical: 14, borderRadius: 999, borderWidth: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
   buttonLabel: { textAlign: 'center', flexShrink: 1 },
   fieldGroup: { gap: 8 },
