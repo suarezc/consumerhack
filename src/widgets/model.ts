@@ -44,12 +44,12 @@ export function ritualDayKey(now: number): string {
 
 export function emptyWidget(url: string): WidgetProps {
   return {
-    presentationVersion: 2, state: "unavailable", count: null, stage: 1, fade: 0,
-    freshness: "missing", freshnessLabel: "Open StoryTime to refresh", expiresAt: null,
-    message: "Your giving ritual, one day at a time.",
+    presentationVersion: 2, state: "unavailable", count: 0, stage: 1, fade: 0,
+    freshness: "missing", freshnessLabel: "Open StoryTime", expiresAt: 0,
+    message: "One question. Every day.",
     totalLabel: "—", answersLabel: "Open today's tree",
     url,
-    fruitImage: null, lockImage: null, lockOutlineImage: null, treeImage: null,
+    fruitImage: "", lockImage: "", lockOutlineImage: "", treeImage: "",
   };
 }
 
@@ -76,7 +76,7 @@ export function widgetAt(snapshot: WidgetSnapshot | null, now: number, url: stri
   if (now >= snapshot.nextBoundaryAt) {
     return { ...empty, freshness: "expired", message: "A new ritual day has begun." };
   }
-  if (!snapshot.historyComplete) return { ...empty, message: "Giving history needs a refresh." };
+  if (!snapshot.historyComplete) return empty;
   const { count, status } = snapshot.giving;
   const state = status === "current" ? "healthy" : status === "at_risk" ? "thirsty" :
     snapshot.hasPriorGiving ? "withered" : "blossom";
@@ -90,9 +90,8 @@ export function widgetAt(snapshot: WidgetSnapshot | null, now: number, url: stri
     stage: count >= 30 ? 30 : count >= 7 ? 7 : count >= 3 ? 3 : 1,
     freshness: aging ? "aging" : "confirmed",
     freshnessLabel: `${aging ? "Last synced" : "As of"} ${time} UTC`,
-    message: state === "healthy" ? "Watered today." : state === "thirsty" ?
-      "Thirsty. Water today to keep it." : state === "withered" ?
-        "Your peach dried. Water to grow a new one." : "Water to grow your first fruit.",
+    message: state === "healthy" ? "Answered today." : state === "thirsty" ?
+      "Answer today to keep it." : "Answer to grow your peach.",
     totalLabel: `$${(snapshot.totalRaisedCents / 100).toFixed(2)}`,
     answersLabel: `${snapshot.answererCount} answered`,
   };

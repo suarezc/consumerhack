@@ -18,8 +18,8 @@ module.exports = function withStoryTimeWidgets(config, options = {}) {
     enableAndroid: false,
     widgets: [{
       name: "StoryTimeGiving",
-      displayName: "Your giving ritual",
-      description: "A peach for your giving streak and today's sandbox tree.",
+      displayName: "Your daily peach",
+      description: "Grow your peach by answering one question every day.",
       ios: {
         supportedFamilies: ["systemSmall", "systemMedium", "accessoryCircular"],
         contentMarginsDisabled: true,
@@ -38,11 +38,28 @@ module.exports = function withStoryTimeWidgets(config, options = {}) {
     const platformRoot = mod.modRequest.platformProjectRoot;
     const directory = path.join(platformRoot, "ExpoWidgetsTarget");
     const fontNames = ["Bricolage.ttf", "Inter.ttf"];
+    const catalog = path.join(directory, "StoryTimeWidgetArt.xcassets");
+    const peach = path.join(catalog, "StoryTimePeach.imageset");
+    fs.mkdirSync(peach, { recursive: true });
+    fs.writeFileSync(path.join(catalog, "Contents.json"), JSON.stringify({ info: { version: 1, author: "xcode" } }));
+    fs.copyFileSync(path.join(mod.modRequest.projectRoot, "assets/widgets/healthy-1.png"), path.join(peach, "peach.png"));
+    fs.writeFileSync(path.join(peach, "Contents.json"), JSON.stringify({
+      images: [{ filename: "peach.png", idiom: "universal" }],
+      info: { version: 1, author: "xcode" },
+      properties: { "template-rendering-intent": "original" },
+    }));
     const resources = project.hash.project.objects.PBXResourcesBuildPhase ?? {};
     if (!nativeTarget.buildPhases.some((phase) => resources[phase.value])) {
       project.addBuildPhase([], "PBXResourcesBuildPhase", "Resources", targetUuid);
     }
     IOSConfig.XcodeUtils.ensureGroupRecursively(project, "StoryTimeWidgetFonts");
+    IOSConfig.XcodeUtils.addResourceFileToGroup({
+      filepath: path.join("ExpoWidgetsTarget", "StoryTimeWidgetArt.xcassets"),
+      groupName: "StoryTimeWidgetFonts",
+      project,
+      targetUuid,
+      isBuildFile: true,
+    });
     for (const name of fontNames) {
       fs.copyFileSync(path.join(mod.modRequest.projectRoot, "assets/widgets/fonts", name), path.join(directory, name));
       IOSConfig.XcodeUtils.addResourceFileToGroup({

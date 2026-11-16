@@ -10,21 +10,20 @@ import type { WidgetProps } from "./model";
 
 export function GivingWidget(props: WidgetProps, environment: WidgetEnvironment) {
   "widget";
-  if (props.presentationVersion !== 2 || (props.expiresAt !== null && Date.now() >= props.expiresAt)) {
+  if (props.presentationVersion !== 2 || (props.expiresAt !== null && props.expiresAt > 0 && Date.now() >= props.expiresAt)) {
     props = {
       ...props, state: "unavailable", count: null, freshness: "expired",
-      freshnessLabel: "Open StoryTime to refresh", message: "A new ritual day has begun.",
+      freshnessLabel: "Open StoryTime", message: "One question. Every day.",
       totalLabel: "—", answersLabel: "Open today's tree",
       fruitImage: null, lockImage: null, lockOutlineImage: null, treeImage: null,
     };
   }
-  const dark = environment.colorScheme === "dark";
-  const ink = dark ? "#E9F0EA" : "#17231C";
-  const muted = dark ? "#9BAA9F" : "#5A6B60";
-  const tile = props.state === "thirsty" ? (dark ? "#262519" : "#F6F3EA") :
-    props.state === "withered" ? (dark ? "#232221" : "#EFEDEA") : (dark ? "#1B2620" : "#FFFFFF");
-  const label = props.count === null ? "Open StoryTime to refresh your giving ritual" :
-    `${props.count} days of giving. ${props.message} ${props.freshnessLabel}.`;
+  const ink = "#E9F0EA";
+  const muted = "#A7B4AD";
+  const tile = "#1D2A33";
+  const hasCount = props.state !== "unavailable" && props.count !== null;
+  const label = !hasCount ? "Open StoryTime" :
+    `${props.count} days in a row. ${props.message}`;
   const bodyFont = "Inter-Regular";
   const displayFont = "BricolageGrotesque-14ptBold";
   if (environment.widgetFamily === "accessoryCircular") {
@@ -37,24 +36,26 @@ export function GivingWidget(props: WidgetProps, environment: WidgetEnvironment)
         {props.lockImage ? (
           <Image uiImage={environment.isLuminanceReduced ? props.lockOutlineImage ?? props.lockImage : props.lockImage}
             modifiers={[resizable(), aspectRatio({ ratio: 1, contentMode: "fit" }), frame({ width: 44, height: 44 })]} />
-        ) : <Image systemName="arrow.clockwise" size={26} />}
+        ) : <Image assetName="StoryTimePeach" modifiers={[
+          resizable(), aspectRatio({ ratio: 1, contentMode: "fit" }), frame({ width: 44, height: 44 }),
+        ]} />}
       </ZStack>
     );
   }
   const medium = environment.widgetFamily === "systemMedium";
-  const fruit = props.fruitImage ? (
-    <Image uiImage={props.fruitImage} modifiers={[
+  const fruit = (
+    <Image {...(props.fruitImage ? { uiImage: props.fruitImage } : { assetName: "StoryTimePeach" })} modifiers={[
       resizable(), aspectRatio({ ratio: 1, contentMode: "fit" }),
       frame({ maxWidth: medium ? 96 : 120, maxHeight: medium ? 96 : 108 }),
-      widgetAccentedRenderingMode("desaturated"),
+      widgetAccentedRenderingMode("fullColor"),
     ]} />
-  ) : <Image systemName="leaf" size={54} color={muted} modifiers={[frame({ height: 90 })]} />;
-  const count = (
+  );
+  const count = hasCount ? (
     <HStack alignment="firstTextBaseline" spacing={5}>
       <Text modifiers={[font({ family: displayFont, size: 26 }), foregroundStyle(ink), lineLimit(1), minimumScaleFactor(0.6)]}>{props.count === null ? "—" : String(props.count)}</Text>
-      <Text modifiers={[font({ family: bodyFont, size: medium ? 10 : 12 }), foregroundStyle(muted)]}>{medium ? "days of giving" : props.count === 1 ? "day" : "days"}</Text>
+      <Text modifiers={[font({ family: bodyFont, size: 11 }), foregroundStyle(muted)]}>{props.count === 1 ? "day in a row" : "days in a row"}</Text>
     </HStack>
-  );
+  ) : <Text modifiers={[font({ family: displayFont, size: 17 }), foregroundStyle(ink), lineLimit(1), minimumScaleFactor(0.7)]}>Open StoryTime</Text>;
   if (medium) {
     return (
       <HStack spacing={14} modifiers={[
@@ -68,7 +69,7 @@ export function GivingWidget(props: WidgetProps, environment: WidgetEnvironment)
           {props.treeImage ? <Image uiImage={props.treeImage} modifiers={[
             resizable(), aspectRatio({ ratio: 74 / 86, contentMode: "fit" }),
             frame({ width: 54, height: 78 }), accessibilityLabel("Today's tree"),
-            widgetAccentedRenderingMode("desaturated"),
+            widgetAccentedRenderingMode("fullColor"),
           ]} /> : <Image systemName="tree" size={38} color={muted} />}
           <VStack alignment="leading" spacing={2}>
             <Text modifiers={[font({ family: bodyFont, weight: "semibold", size: 20 }), foregroundStyle(ink), lineLimit(1), minimumScaleFactor(0.6)]}>{props.totalLabel}</Text>
