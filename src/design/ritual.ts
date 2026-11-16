@@ -42,7 +42,7 @@ export function streakCopy(state: StreakState, kind: 'answer' | 'giving') {
   const days = `${state.count} ${state.count === 1 ? 'day' : 'days'}`;
   const activity = kind === 'answer' ? 'answering' : 'giving';
   return {
-    label: `${days} ${activity}`,
+    label: kind === 'answer' ? `${days} in a row` : `${days} ${activity}`,
     detail: state.status === 'at_risk' ? 'Continue today' : '',
     description: `${days} of ${activity}. ${state.status === 'at_risk'
       ? kind === 'answer' ? 'Not yet answered this ritual day. There is still time today.' : 'No paid watering confirmed this ritual day. There is still time today.'

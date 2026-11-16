@@ -82,9 +82,9 @@ const styles = StyleSheet.create({
   scene: { flex: 1 },
   header: { paddingHorizontal: 28, paddingTop: 10, gap: 10, width: '100%', maxWidth: 560, alignSelf: 'center' },
   metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 },
-  meta: { fontSize: 9, lineHeight: 15, letterSpacing: 1.6 },
+  meta: { fontSize: 14, lineHeight: 20 },
   smallAction: { minWidth: 44, minHeight: 44, justifyContent: 'center', alignItems: 'flex-end' },
-  question: { fontSize: 31, lineHeight: 37, letterSpacing: -0.3 },
+  question: { fontSize: 32, lineHeight: 40 },
   treeSpace: { flex: 1, minHeight: 100 },
   controls: { paddingHorizontal: 28, paddingTop: 8, paddingBottom: 10, gap: 4, width: '100%', maxWidth: 480, alignSelf: 'center' },
   sheetHost: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(4,5,13,0.18)' },
@@ -100,5 +100,5 @@ const styles = StyleSheet.create({
 export const productSceneStyles = StyleSheet.create({
   primary: { minHeight: 54, backgroundColor: '#f6efe6', borderColor: '#f6efe6' },
   secondary: { minHeight: 44, justifyContent: 'center', alignItems: 'center' },
-  secondaryLabel: { fontSize: 9, lineHeight: 15, letterSpacing: 1.6 },
+  secondaryLabel: { fontSize: 14, lineHeight: 20 },
 });

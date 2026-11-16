@@ -47,7 +47,7 @@ describe('quiet summary copy', () => {
   });
 
   it('uses supplied current/none states without a date calculation', () => {
-    expect(streakCopy({ count: 1, status: 'current' }, 'answer')).toMatchObject({ label: '1 day answering', detail: '' });
+    expect(streakCopy({ count: 1, status: 'current' }, 'answer')).toMatchObject({ label: '1 day in a row', detail: '' });
     expect(streakCopy({ count: 0, status: 'none' }, 'giving').label).toBe('A little care');
   });
 });

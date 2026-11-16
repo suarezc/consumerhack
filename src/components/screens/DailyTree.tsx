@@ -10,7 +10,7 @@ import { WateringComposer } from "@/components/screens/WateringComposer";
 import { RemindersSettings } from "@/components/screens/RemindersSettings";
 import { FruitDetailStatus } from "@/components/screens/FruitDetailStatus";
 import { getTreeDataStatus } from "@/components/tree/bridge";
-import { AnswerCard, CharityDetails, GivingFeedback, productSceneStyles, StoryButton, StoryField, StoryText, TodayCharitySummary, TodayStreaks, useStoryTime } from "@/design";
+import { AnswerCard, CharityDetails, GivingFeedback, productSceneStyles, StoryButton, StoryField, StoryText, StoryTimeProvider, themeAt, TodayCharitySummary, TodayStreaks, useStoryTime } from "@/design";
 import { useRitual, type Today } from "@/providers/RitualProvider";
 import { useSession } from "@/providers/SessionProvider";
 import { api } from "@/services/api";
@@ -26,7 +26,21 @@ export function DailyTree({ bloom = false }: { bloom?: boolean }) {
 function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
   const { session, selectTree } = useSession();
   const { timeOfDay, now, watering, consumeGivingFeedback } = useRitual();
-  const { theme } = useStoryTime();
+  const { reducedMotion } = useStoryTime();
+  const [opening, setOpening] = useState(0);
+  useEffect(() => {
+    if (reducedMotion) return;
+    const started = performance.now();
+    const timer = setInterval(() => {
+      const progress = Math.min(1, (performance.now() - started) / 2400);
+      setOpening(progress * progress * (3 - 2 * progress));
+      if (progress === 1) clearInterval(timer);
+    }, 50);
+    return () => clearInterval(timer);
+  }, [reducedMotion]);
+  const sceneTime = today.day.isDemo && today.myAnswer ? 1
+    : Math.max(0.42 + 0.58 * timeOfDay, reducedMotion ? 0.56 : 0.42 + 0.14 * opening);
+  const theme = themeAt(sceneTime);
   const submitAnswer = useMutation(api.answers.submit);
   const sendNote = useMutation(api.notes.send);
   const restartDemo = useMutation(api.demo.restart);
@@ -101,7 +115,7 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
   if (needsSample) return <Scene timeOfDay={timeOfDay} meta="StoryTime · S.A.C.K." title="Opening today’s tree…" />;
 
   const detail = unlocked ? `${today.answerCount} ${today.answerCount === 1 ? "answer" : "answers"} · tap to read` : `${today.answerCount} of ${today.memberCount} answered${today.day.isDemo ? "" : ` · bloom ${bloomLabel(today.day.bloomAt)} local time`}`;
-  return <Scene timeOfDay={timeOfDay} title={today.day.question}
+  return <StoryTimeProvider timeOfDay={sceneTime}><Scene timeOfDay={sceneTime} title={today.day.question}
     treeKey={`${today.tree.treeId}:${today.day.dayId}`}
     treeUnavailable={detailUnavailable}
     meta={`${bloom ? "Bloom" : "StoryTime"} · ${today.tree.name}`} detail={detail} onPressDetail={unlocked ? readNext : undefined}
@@ -166,5 +180,5 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
       }} />
       {!!error && <StoryText color="#ffd27a" accessibilityRole="alert">{error}</StoryText>}
     </Panel>}
-  </Scene>;
+  </Scene></StoryTimeProvider>;
 }

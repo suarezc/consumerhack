@@ -13,7 +13,7 @@ export function TodayStreaks({ summary, color, compact = false }: TodayStreaksPr
   const ink = color ?? theme.text;
   if (!summary) return <StoryText variant="meta" color={ink} accessibilityLabel="Loading your ritual days">Gathering your days…</StoryText>;
   if (compact) {
-    const copy = streakCopy(summary.giving, 'giving');
+    const copy = streakCopy(summary.answer, 'answer');
     return <View style={styles.inline}><RitualMark kind="fruit" /><StoryText variant="caption" color={ink}
       accessibilityLabel={`${copy.description}`} style={{ fontSize: 14, lineHeight: 20 }}>{copy.label}</StoryText></View>;
   }
@@ -94,7 +94,7 @@ function GivingFeedbackSession({ baselineId, event, onConsumed, color }: GivingF
     return () => clearTimeout(timer);
   }, [baselineId, eventId, eventBaseline, givingCount, isDemo, onConsumed]);
 
-  const text = notice ? `${notice.givingCount} ${notice.givingCount === 1 ? 'day' : 'days'} of giving` : '';
+  const text = notice ? 'Thank you. The tree is watered.' : '';
 
   useEffect(() => {
     if (Platform.OS === 'ios' && text) AccessibilityInfo.announceForAccessibilityWithOptions(text, { queue: true, priority: 'low' });
