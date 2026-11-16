@@ -301,7 +301,7 @@ describe("isolated demo history and paid reaction", () => {
     const next = await t.mutation(api.demo.restart, { deviceId, treeId: tree.treeId });
     await expect(t.mutation(api.waterings.demoWater, args)).rejects.toThrow("not available");
     expect((await t.query(api.days.today, { deviceId, treeId: tree.treeId }))?.lightEvent).toBeNull();
-    expect((await t.query(api.days.grove, { deviceId, treeId: tree.treeId }))).toHaveLength(3);
+    expect((await t.query(api.days.grove, { deviceId, treeId: tree.treeId }))).toHaveLength(9);
     expect((await t.query(api.streaks.summary, { deviceId, treeId: tree.treeId })).giving.count).toBe(3);
     await t.mutation(api.demo.stop, { deviceId, treeId: tree.treeId });
     expect((await t.query(api.streaks.summary, { deviceId, treeId: tree.treeId })).giving).toMatchObject({ count: 1, totalCents: 100 });

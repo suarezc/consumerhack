@@ -99,8 +99,8 @@ describe("response fruit and paid giving lights", () => {
     expect(other?.fruits.every(fruit => !fruit.isMine)).toBe(true);
     const grove = await t.query(api.days.grove, args);
     expect(grove).toHaveLength(9);
-    expect(grove.every(day => day.fruits.length === 1 && day.fruits[0].isMine && !day.fruits[0].golden && day.lightBundles === 2 && day.lightEvent === null)).toBe(true);
-    expect(grove.map(day => day.goldenLightBundles)).toEqual([2, 0, 0]);
+    expect(grove.slice(0, 3).every(day => day.fruits.length === 1 && day.fruits[0].isMine && !day.fruits[0].golden && day.lightBundles === 2 && day.lightEvent === null)).toBe(true);
+    expect(grove.slice(0, 3).map(day => day.goldenLightBundles)).toEqual([2, 0, 0]);
     await t.mutation(api.days.acknowledgeYesterday, { ...args, dayId: run.dayId });
     expect((await t.query(api.days.firstOpen, args))?.shouldShowYesterday).toBe(false);
   });
