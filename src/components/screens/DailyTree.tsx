@@ -2,7 +2,7 @@ import { useMutation } from "convex/react";
 import { router } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { View } from "react-native";
+import { Share, View } from "react-native";
 
 import { Panel, Scene, sceneStyles } from "@/components/screens/Scene";
 import { LoadingDay, TreeNavigation } from "@/components/screens/Screen";
@@ -66,6 +66,8 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
   const [sampleFailed, setSampleFailed] = useState(false);
   const sampleStarted = useRef(false);
   const lastRead = useRef(-1);
+  const [fireflies, setFireflies] = useState(0);
+  const [shareOpen, setShareOpen] = useState(false);
   const deviceId = session?.deviceId;
   const treeId = today.tree.treeId;
   const needsSample = today.tree.isHost && !today.myAnswer && !sampleFailed
@@ -126,7 +128,8 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
       <FruitDetailStatus status={fruitStatus} fruitCount={fruits.length} />
     </View>}
     tree={{ answers: today.answerCount, mine: today.myAnswer ? [today.myAnswer.blossom] : [], notes, lanterns: 0, onTapBlossom: choose,
-      fruits, lightBundles: today.lightBundles, goldenLightBundles: today.goldenLightBundles, lightEvent: watering.treeEvent }}
+      fruits, lightBundles: Math.ceil(today.lightBundles / 2), goldenLightBundles: Math.ceil(today.goldenLightBundles / 2),
+      lightEvent: watering.treeEvent && { ...watering.treeEvent, lightBundles: Math.ceil(watering.treeEvent.lightBundles / 2) } }}
     overlay={(controlsHeight) => (
     <AnswerCard controlsHeight={controlsHeight} open={selected !== null} answer={selected && { id: selected.answerId, text: selected.text, author: selected.name, isMine: selected.memberId === today.member.memberId }}
       onClose={() => { if (!busy) { setSelectedIndex(null); setNoteComposer(false); setError(""); } }}
@@ -150,6 +153,7 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
     {today.myAnswer && !unlocked && <StoryText variant="caption" color={detailUnavailable ? theme.text : theme.paper}>Your answer is planted.</StoryText>}
     {!today.myAnswer && !canAnswer && <StoryText color={detailUnavailable ? theme.text : theme.paper}>{now < today.day.opensAt ? "The question opens soon." : "This day has closed. Come back for tomorrow’s question."}</StoryText>}
     {today.tree.isHost && !today.myAnswer && !canAnswer && <StoryButton label="Start a fresh day" tone="quiet" loading={busy} onPress={freshDay} />}
+    {fireflies > 0 && <StoryButton label={`Share your ${fireflies} ${fireflies === 1 ? "firefly" : "fireflies"}`} tone="quiet" onPress={() => setShareOpen(true)} />}
     {today.myAnswer && <StoryButton label="Support S.A.C.K." style={productSceneStyles.primary} onPress={() => setWateringOpen(true)} />}
     <TreeNavigation hill={!detailUnavailable} compact />
     {!!error && !composer && !selected && !settings && <StoryText color="#ffd27a" accessibilityRole="alert">{error}</StoryText>}
@@ -171,7 +175,15 @@ function DailyTreeContent({ today, bloom }: { today: Today; bloom: boolean }) {
         void run(() => selectTree(null), () => router.replace({ pathname: "/", params: { choose: "1" } }));
       }} />
     </Panel>}
-    {wateringOpen && <WateringComposer today={today} onClose={() => setWateringOpen(false)} />}
+    {wateringOpen && <WateringComposer today={today} onClose={() => setWateringOpen(false)}
+      onPaid={(added) => { setWateringOpen(false); setFireflies((count) => count + added); }} />}
+    {shareOpen && <Panel title="Your fireflies." onClose={() => setShareOpen(false)}>
+      <StoryText color="#ffd27a" style={{ fontSize: 72, lineHeight: 80, textAlign: "center" }}>{fireflies}</StoryText>
+      <StoryText color="#f6efe6" style={{ textAlign: "center" }}>{fireflies === 1 ? "firefly" : "fireflies"} on today’s tree are yours. Each one is a dollar for S.A.C.K.</StoryText>
+      <StoryButton label="Share" onPress={() => {
+        void Share.share({ message: `I lit ${fireflies} ${fireflies === 1 ? "firefly" : "fireflies"} on today’s StoryTime tree for S.A.C.K. https://suarezc-storytime.expo.app` }).catch(() => undefined);
+      }} />
+    </Panel>}
     {charityOpen && <Panel title="Today’s charity." onClose={() => setCharityOpen(false)}>
       <CharityDetails charity={today.charity} onOpenLink={(url) => {
         void WebBrowser.openBrowserAsync(url).catch(() => setError("The charity website couldn’t open. Please try again."));
