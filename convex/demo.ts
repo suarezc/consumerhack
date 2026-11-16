@@ -10,6 +10,11 @@ import { ensureSackCause, sackCharity } from "./charity";
 import { ensureMemberUser } from "./identity";
 import { refreshClosedImpact } from "./impact";
 
+const todayTexts = [
+  "My neighbour taught me to ride a bike when my parents were working late.",
+  "A teacher kept a granola bar in her desk for me, and never made it a thing.",
+  "My grandmother wrote my name inside every book she gave me.",
+];
 const samples = [
   { name: "Maya", text: "A friend saved me a seat without being asked." },
   { name: "Theo", text: "The light through the kitchen window while the kettle boiled." },
@@ -26,7 +31,7 @@ export const restart = mutation({
     const opensAt = Date.now();
     const bloomAt = opensAt + 10 * 60_000;
     const ritualDate = ritualWindow(opensAt).date;
-    const dayId = await ctx.db.insert("days", { treeId, date: `demo:${opensAt}`, ritualDate, question: "What small thing made today feel a little softer?", opensAt, bloomAt, isDemo: true, charity: sackCharity, causeId });
+    const dayId = await ctx.db.insert("days", { treeId, date: `demo:${opensAt}`, ritualDate, question: "What kindness do you still remember from your childhood?", opensAt, bloomAt, isDemo: true, charity: sackCharity, causeId });
     await ctx.db.patch(dayId, { demoRunId: dayId });
     await ctx.db.patch(treeId, { demoDayId: dayId });
     for (let offset = -3; offset < 0; offset++) {
@@ -88,7 +93,7 @@ export const restart = mutation({
         const id = await ctx.db.insert("members", { treeId, deviceId: sampleDevice, name: sample.name, joinedAt: opensAt, isDemo: true });
         member = await ctx.db.get(id);
       }
-      await ctx.scheduler.runAfter((index + 1) * 10_000, internal.demo.seed, { dayId, memberId: member!._id, text: sample.text });
+      await ctx.scheduler.runAfter((index + 1) * 10_000, internal.demo.seed, { dayId, memberId: member!._id, text: todayTexts[index] ?? sample.text });
     }
     await ctx.scheduler.runAt(bloomAt, internal.lifecycle.bloom, { dayId });
     return { dayId, opensAt, bloomAt };
