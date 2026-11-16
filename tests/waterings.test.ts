@@ -277,7 +277,7 @@ describe("isolated demo history and paid reaction", () => {
     const run = await t.mutation(api.demo.restart, { deviceId, treeId: tree.treeId });
     expect(await t.query(api.streaks.summary, { deviceId, treeId: tree.treeId })).toMatchObject({ answer: { count: 3, status: "at_risk" }, giving: { count: 3, status: "at_risk", totalCents: 300 }, isDemo: true });
     const grove = await t.query(api.days.grove, { deviceId, treeId: tree.treeId });
-    expect(grove).toHaveLength(3);
+    expect(grove).toHaveLength(9);
     expect(grove[0].fruits).toHaveLength(1);
     expect(grove[0].fruits[0]).toMatchObject({ golden: false, isMine: true });
     expect(grove[0].lightBundles).toBe(2);

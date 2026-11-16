@@ -361,7 +361,7 @@ describe("first-open impact and isolated40/12 demo", () => {
     expect(await t.query(api.streaks.summary, args)).toMatchObject({ answer: { count: 3, status: "at_risk" }, giving: { count: 3, status: "at_risk", totalCents: 300 } });
     const data = await t.run(async ctx => ({ days: await ctx.db.query("days").withIndex("by_tree", q => q.eq("treeId", tree.treeId)).collect(),
       own: await ctx.db.query("lanterns").withIndex("by_member", q => q.eq("memberId", tree.memberId)).collect() }));
-    expect(data.days.filter(day => day.demoRunId === run.dayId)).toHaveLength(4);
+    expect(data.days.filter(day => day.demoRunId === run.dayId)).toHaveLength(10);
     expect(data.own.filter(row => row.demoRunId === run.dayId)).toHaveLength(3);
     const input = { ...args, dayId: run.dayId, bundles: 5 as const, requestId: "demo-interaction-00001" };
     await expect(t.mutation(api.waterings.demoWater, input)).rejects.toThrow("answer first");
